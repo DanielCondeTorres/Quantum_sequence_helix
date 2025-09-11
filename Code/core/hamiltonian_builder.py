@@ -51,7 +51,9 @@ class HamiltonianBuilder:
         self.helix_prop = np.array([properties[aa]['helix'] for aa in self.amino_acids])
         self.hydrophobic = np.array([properties[aa]['hydrophobic'] for aa in self.amino_acids])
         self.charges = np.array([properties[aa]['charge'] for aa in self.amino_acids])
-        self.h_alpha = self.helix_prop + self.hydrophobic
+        # FIX: Eliminamos la propiedad de hidrofobicidad del término local.
+        # Ahora el término local solo se encarga de la preferencia de hélice.
+        self.h_alpha = self.helix_prop
     
     def _projector_terms_for_code(self, position: int, code: int, base_coeff: float):
         b = self.bits_per_pos
@@ -129,7 +131,7 @@ class HamiltonianBuilder:
             in_mem = self._pos_in_membrane(i)
             env_pref = 1.0 if in_mem else -1.0
             for α in range(self.n_aa):
-                base = weight * env_pref * self.hydrophobic[α]
+                base = -weight * env_pref * self.hydrophobic[α]
                 self._projector_terms_for_code(i, α, base)
     
     def _add_membrane_charge_term(self, weight: float):

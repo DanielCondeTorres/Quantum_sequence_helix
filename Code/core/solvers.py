@@ -60,7 +60,8 @@ class QAOASolver:
             for s in range(len(starts), n_starts):
                 starts.append(self._init_params(p_stage, init_strategy, s + p_stage * 100))
             
-            optimizer = qml.AdamOptimizer(stepsize=0.1)
+            #optimizer = qml.AdamOptimizer(stepsize=0.1)
+            optimizer = qml.SPSAOptimizer(stepsize=0.1, resamplings=5)
             optimizer_fine = qml.AdamOptimizer(stepsize=0.02)
             for idx, params in enumerate(starts):
                 costs = []
