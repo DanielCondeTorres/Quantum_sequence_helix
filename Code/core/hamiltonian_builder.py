@@ -3,6 +3,7 @@ import numpy as np
 import pennylane as qml
 from typing import List, Tuple, Optional
 from utils.general_utils import get_qubit_index
+from data_loaders.energy_matrix_loader import _load_energy_matrix_file
 
 class HamiltonianBuilder:
     """
@@ -18,6 +19,10 @@ class HamiltonianBuilder:
         self.kwargs = kwargs
         self.pauli_terms = []
         self._init_amino_acid_properties()
+        # Debugging prints
+        print("\nDEBUG: Propiedades de los aminoácidos en uso:")
+        for idx, aa in enumerate(self.amino_acids):
+            print(f"  - {aa}: hidrofobicidad={self.hydrophobic[idx]:.2f}")
     
     def _init_amino_acid_properties(self):
         # Simplified properties for quantum demo
@@ -51,8 +56,6 @@ class HamiltonianBuilder:
         self.helix_prop = np.array([properties[aa]['helix'] for aa in self.amino_acids])
         self.hydrophobic = np.array([properties[aa]['hydrophobic'] for aa in self.amino_acids])
         self.charges = np.array([properties[aa]['charge'] for aa in self.amino_acids])
-        # FIX: Eliminamos la propiedad de hidrofobicidad del término local.
-        # Ahora el término local solo se encarga de la preferencia de hélice.
         self.h_alpha = self.helix_prop
     
     def _projector_terms_for_code(self, position: int, code: int, base_coeff: float):
@@ -77,6 +80,7 @@ class HamiltonianBuilder:
             for α in range(self.n_aa):
                 base = -weight * self.h_alpha[α]
                 self._projector_terms_for_code(i, α, base)
+    
     
     def _add_pairwise_terms(self, weight: float):
         if self.bits_per_pos > 3: return
@@ -111,6 +115,42 @@ class HamiltonianBuilder:
                                                 pauli[get_qubit_index(j, k, self.bits_per_pos)] = 'Z'
                                         self.pauli_terms.append((coeff, ''.join(pauli)))
     
+    def _add_miyazawa_jernigan_terms(self, weight: float, max_dist: int):
+        """Adds Miyazawa-Jernigan interaction terms to the Hamiltonian."""
+        mj_interaction, list_aa = _load_energy_matrix_file()
+        aa_to_idx = {aa: i for i, aa in enumerate(list_aa)}
+
+        for i in range(self.L):
+            for j in range(i + 1, self.L):
+                if abs(i - j) <= max_dist:
+                    for α in range(self.n_aa):
+                        for β in range(self.n_aa):
+                            aa_i = self.amino_acids[α]
+                            aa_j = self.amino_acids[β]
+                            
+                            mj_idx_i = aa_to_idx[aa_i]
+                            mj_idx_j = aa_to_idx[aa_j]
+                            interaction_energy = mj_interaction[min(mj_idx_i, mj_idx_j), max(mj_idx_i, mj_idx_j)]
+
+                            if not np.isclose(interaction_energy, 0.0):
+                                base = weight * interaction_energy
+                                b = self.bits_per_pos
+                                
+                                s_i = [1.0 if ((α >> k) & 1) == 0 else -1.0 for k in range(b)]
+                                s_j = [1.0 if ((β >> k) & 1) == 0 else -1.0 for k in range(b)]
+                                for mask_i in range(1 << b):
+                                    for mask_j in range(1 << b):
+                                        coeff = base * (1.0 / (2 ** (2*b)))
+                                        pauli = ['I'] * self.n_qubits
+                                        for k in range(b):
+                                            if (mask_i >> k) & 1:
+                                                coeff *= s_i[k]
+                                                pauli[get_qubit_index(i, k, self.bits_per_pos)] = 'Z'
+                                            if (mask_j >> k) & 1:
+                                                coeff *= s_j[k]
+                                                pauli[get_qubit_index(j, k, self.bits_per_pos)] = 'Z'
+                                        self.pauli_terms.append((coeff, ''.join(pauli)))
+    
     def _pos_in_membrane(self, pos: int) -> bool:
         mode = self.kwargs.get('membrane_mode', 'span')
         if mode == 'set':
@@ -127,8 +167,10 @@ class HamiltonianBuilder:
         return False
     
     def _add_environment_terms(self, weight: float):
+        print("\nDEBUG: Término de entorno activado.")
         for i in range(self.L):
             in_mem = self._pos_in_membrane(i)
+            print(f"  - Posición {i}: {'En membrana' if in_mem else 'En agua'}")
             env_pref = 1.0 if in_mem else -1.0
             for α in range(self.n_aa):
                 base = -weight * env_pref * self.hydrophobic[α]
@@ -180,16 +222,30 @@ class HamiltonianBuilder:
     
     def build_hamiltonian(self, backend: str):
         print("Building quantum Hamiltonian...")
-        self._add_local_terms(weight=1.0)
-        self._add_pairwise_terms(weight=0.5)
+        # Local amino acid preferences
+        self._add_local_terms(weight=self.kwargs.get('lambda_local', 1.0))
+        
+        # Miyazawa-Jernigan pairwise interactions (always on)
+        print("Adding Miyazawa-Jernigan terms...")
+        self._add_miyazawa_jernigan_terms(weight=self.kwargs.get('lambda_pairwise', 1.0),
+                                         max_dist=self.kwargs.get('max_interaction_dist', 3))
+
+        # Environment preference
         if self.kwargs.get('lambda_env', 0.0) != 0.0:
             self._add_environment_terms(self.kwargs.get('lambda_env', 0.0))
+
+        # Membrane charge interaction term
         if self.kwargs.get('lambda_charge', 0.0) != 0.0:
             self._add_membrane_charge_term(self.kwargs.get('lambda_charge', 0.0))
+
+        # Hydrophobic moment encouragement
         if self.kwargs.get('lambda_mu', 0.0) != 0.0:
             self._add_hydrophobic_moment_terms(self.kwargs.get('lambda_mu', 0.0))
+
+        # Penalize invalid codes
         self._add_invalid_code_penalties(weight=20.0)
-        print(f"Hamiltonian built with {len(self.pauli_terms)} Pauli terms")
+        
+        print(f"\nHamiltonian built with {len(self.pauli_terms)} Pauli terms")
         
         if backend == 'pennylane':
             coeffs = [term[0] for term in self.pauli_terms]
