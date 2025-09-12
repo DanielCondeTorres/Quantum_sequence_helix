@@ -382,3 +382,7 @@ if __name__ == '__main__':
         designer.plot_alpha_helix_wheel(qaoa_result['repaired_sequence'])
     
 # python cursor_peptide_seq.py -L 6 -R VQ  --membrane_mode wheel --wheel_phase_deg 0 --wheel_halfwidth_deg 30  --lambda_env 0.6 --lambda_mu 0.4 --lambda_charge 0.3 --membrane_charge neg
+
+
+
+# python main_final.py -L 6 -R V,Q,N,S --lambda_pairwise 0.5  --lambda_helix_pairs 0.5  --lambda_env 5.0  --lambda_local 0.2 --membrane_mode wheel --wheel_phase_deg 0 --wheel_halfwidth_deg 90
