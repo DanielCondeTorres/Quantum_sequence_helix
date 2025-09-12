@@ -314,6 +314,7 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_mu', type=float, default=0.0, help='Weight of the hydrophobic moment term.')
     parser.add_argument('--lambda_local', type=float, default=1.0, help='Weight of the local preference terms.')
     parser.add_argument('--lambda_pairwise', type=float, default=1.0, help='Weight of the pairwise interaction term (Miyazawa-Jernigan).')
+    parser.add_argument('--lambda_helix_pairs', type=float, default=0.0, help='Weight of the helix pair propensity term.')
     parser.add_argument('--max_interaction_dist', type=int, default=3, help='Maximum sequence distance for pairwise interactions.')
     parser.add_argument('--membrane_charge', type=str, default='neu', choices=['neu', 'neg', 'pos'], help='Charge of the membrane.')
     parser.add_argument('--classical', action='store_true', help='Solve using classical brute-force instead of quantum.')
@@ -356,6 +357,7 @@ if __name__ == '__main__':
         lambda_mu=args.lambda_mu,
         lambda_local=args.lambda_local,
         lambda_pairwise=args.lambda_pairwise,
+        lambda_helix_pairs=args.lambda_helix_pairs,
         max_interaction_dist=args.max_interaction_dist,
         membrane_positions=mem_positions,
         membrane_mode=args.membrane_mode,

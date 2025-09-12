@@ -1,12 +1,23 @@
 import numpy as np
 
-# Amino acid order in the M_H[i,j] matrix (from the provided image)
-aa_order = [
-    "ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE", 
+# Mapping de 3 letras → 1 letra
+aa_map = {
+    "ALA": "A", "ARG": "R", "ASN": "N", "ASP": "D", "CYS": "C",
+    "GLN": "Q", "GLU": "E", "GLY": "G", "HIS": "H", "ILE": "I",
+    "LEU": "L", "LYS": "K", "MET": "M", "PHE": "F", "PRO": "P",
+    "SER": "S", "THR": "T", "TRP": "W", "TYR": "Y", "VAL": "V"
+}
+
+# Amino acid order (3 letras, como en la imagen original)
+aa_order_3 = [
+    "ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE",
     "LEU", "LYS", "MET", "PHE", "PRO", "SER", "THR", "TRP", "TYR", "VAL"
 ]
 
-# Matrix values (extracted manually from the image, row by row)
+# Convertimos a 1 letra
+aa_order_1 = [aa_map[aa] for aa in aa_order_3]
+
+# Matriz (igual que antes)
 M_H = [
     [2.734, 1.648, 1.224, 1.769, 1.448, 1.777, 1.900, 1.155, 1.238, 1.275, 1.575, 1.297, 1.580, 1.143, 1.276, 1.484, 1.297, 1.342, 1.069, 1.197],
     [1.724, 1.466, 1.013, 1.804, 0.893, 1.483, 2.523, 0.770, 1.107, 1.117, 1.374, 1.016, 1.204, 0.918, 1.000, 1.244, 1.192, 1.244, 1.206, 1.063],
@@ -30,12 +41,13 @@ M_H = [
     [1.107, 0.728, 0.699, 0.756, 0.814, 0.704, 0.763, 0.514, 0.994, 1.167, 1.238, 0.553, 1.139, 1.283, 0.741, 0.712, 0.995, 1.053, 1.072, 1.062]
 ]
 
-# Save in the same format as mj_matrix.txt but with new filename
+# Guardar con encabezado de 1 letra
 output_file = "helix_pairs_prop.txt"
 
 with open(output_file, "w") as f:
-    f.write("\t".join(aa_order) + "\n")
+    f.write("\t".join(aa_order_1) + "\n")
     for row in M_H:
         f.write("\t".join([f"{val:.3f}" for val in row]) + "\n")
 
-output_file
+print("Archivo generado:", output_file)
+

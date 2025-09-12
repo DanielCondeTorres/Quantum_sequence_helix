@@ -3,7 +3,7 @@ import numpy as np
 import pennylane as qml
 from typing import List, Tuple, Optional
 from utils.general_utils import get_qubit_index
-from data_loaders.energy_matrix_loader import _load_energy_matrix_file
+from data_loaders.energy_matrix_loader import _load_energy_matrix_file, _load_helix_pairs_matrix_file
 
 class HamiltonianBuilder:
     """
@@ -151,6 +151,46 @@ class HamiltonianBuilder:
                                                 pauli[get_qubit_index(j, k, self.bits_per_pos)] = 'Z'
                                         self.pauli_terms.append((coeff, ''.join(pauli)))
     
+    def _add_helix_pairs_terms(self, weight: float, max_dist: int):
+        """Adds helix pair propensity interaction terms to the Hamiltonian."""
+        helix_matrix, list_aa = _load_helix_pairs_matrix_file()
+        aa_to_idx = {aa: i for i, aa in enumerate(list_aa)}
+
+        for i in range(self.L):
+            for j in range(i + 1, self.L):
+                if abs(i - j) <= max_dist:
+                    for α in range(self.n_aa):
+                        for β in range(self.n_aa):
+                            aa_i = self.amino_acids[α]
+                            aa_j = self.amino_acids[β]
+
+                            idx_i = aa_to_idx[aa_i]
+                            idx_j = aa_to_idx[aa_j]
+
+                            # ahora usamos la matriz completa (no triangular)
+                            interaction_prop = helix_matrix[idx_i, idx_j]
+
+                            if not np.isclose(interaction_prop, 0.0):
+                                base = weight * interaction_prop
+                                b = self.bits_per_pos
+
+                                s_i = [1.0 if ((α >> k) & 1) == 0 else -1.0 for k in range(b)]
+                                s_j = [1.0 if ((β >> k) & 1) == 0 else -1.0 for k in range(b)]
+                                for mask_i in range(1 << b):
+                                    for mask_j in range(1 << b):
+                                        coeff = base * (1.0 / (2 ** (2 * b)))
+                                        pauli = ['I'] * self.n_qubits
+                                        for k in range(b):
+                                            if (mask_i >> k) & 1:
+                                                coeff *= s_i[k]
+                                                pauli[get_qubit_index(i, k, self.bits_per_pos)] = 'Z'
+                                            if (mask_j >> k) & 1:
+                                                coeff *= s_j[k]
+                                                pauli[get_qubit_index(j, k, self.bits_per_pos)] = 'Z'
+                                        self.pauli_terms.append((coeff, ''.join(pauli)))
+    
+    
+    
     def _pos_in_membrane(self, pos: int) -> bool:
         mode = self.kwargs.get('membrane_mode', 'span')
         if mode == 'set':
@@ -229,6 +269,12 @@ class HamiltonianBuilder:
         print("Adding Miyazawa-Jernigan terms...")
         self._add_miyazawa_jernigan_terms(weight=self.kwargs.get('lambda_pairwise', 1.0),
                                          max_dist=self.kwargs.get('max_interaction_dist', 3))
+
+        # New: Helix pair propensities
+        if self.kwargs.get('lambda_helix_pairs', 0.0) != 0.0:
+            print("Adding Helix Pair Propensity terms...")
+            self._add_helix_pairs_terms(weight=self.kwargs.get('lambda_helix_pairs', 0.0),
+                                        max_dist=self.kwargs.get('max_interaction_dist', 3))
 
         # Environment preference
         if self.kwargs.get('lambda_env', 0.0) != 0.0:
