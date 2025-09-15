@@ -110,7 +110,7 @@ class QuantumProteinDesign:
         plt.title(f'Top Probability Distribution of Amino Acid Sequences from {solver_name}')
         plt.xticks(range(len(sequences)), sequences, rotation=90)
         plt.tight_layout()
-        plt.savefig(f'{solver_name.lower()}_probability_plot.png')  # Save to file
+        plt.savefig(f'{solver_name.lower()}_probability_plot.png',dpi=300)  # Save to file
         plt.close()  # Close the figure to avoid memory issues
         print(f"Plot saved as {solver_name.lower()}_probability_plot.png")
 
@@ -350,7 +350,7 @@ class QuantumProteinDesign:
         plt.ylabel('Energy')
         plt.title('Quantum Optimization Convergence')
         plt.grid(True, alpha=0.3)
-        plt.savefig('optimization_convergence.png')  # Save to file
+        plt.savefig('optimization_convergence.png',dpi=300)  # Save to file
         plt.close()
 
     def plot_alpha_helix_wheel(self, sequence: str):
@@ -412,7 +412,7 @@ class QuantumProteinDesign:
         ax.set_ylim(-1.3, 1.3)
         ax.axis('off')
         plt.title('Alpha-Helix Wheel')
-        plt.savefig('alpha_helix_wheel.png')  # Save to file
+        plt.savefig('alpha_helix_wheel.png',dpi=300)  # Save to file
         plt.close()
 
 def run_quantum_protein_design(sequence_length, amino_acids, quantum_backend='pennylane', 
