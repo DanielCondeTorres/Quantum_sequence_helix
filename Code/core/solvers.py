@@ -3,13 +3,14 @@ import pennylane as qml
 from pennylane import numpy as qnp
 from typing import List, Tuple, Dict, Any, Optional
 import itertools
+import matplotlib.pyplot as plt  # Added for plotting
 
 class QAOASolver:
     """
     Manages the QAOA circuit and optimization process with PennyLane.
     Improved with multi-layer support, warm-start initialization, and native PennyLane optimizer.
     """
-    def __init__(self, cost_hamiltonian, n_qubits, pauli_terms, amino_acids, L, bits_per_pos, layers=1, warm_start=False):
+    def __init__(self, cost_hamiltonian, n_qubits, pauli_terms, amino_acids, L, bits_per_pos, layers=1, warm_start=False, shots: int = 1000):
         self.cost_hamiltonian = cost_hamiltonian
         self.n_qubits = n_qubits
         self.pauli_terms = pauli_terms
@@ -17,7 +18,7 @@ class QAOASolver:
         self.L = L
         self.bits_per_pos = bits_per_pos
         self.n_aa = len(amino_acids)
-        self.dev = qml.device('lightning.qubit', wires=self.n_qubits)
+        self.dev = qml.device('lightning.qubit', wires=self.n_qubits, shots=shots)  # Added shots parameter
         self.layers = layers  # Number of QAOA layers (p)
         self.warm_start = warm_start  # Option for warm-start initialization
 
@@ -88,6 +89,18 @@ class QAOASolver:
             return qml.probs(wires=range(self.n_qubits))
 
         probs = prob_circuit()
+        print(f"Number of shots used: {self.dev.shots}")  # Debug shot count
+        print("Probabilities:", probs)  # Debug print
+        print("Number of probabilities:", len(probs))  # Debug print
+        if len(probs) == 0:
+            print("Warning: No probabilities computed. Check Hamiltonian or circuit.")
+            return {
+                'bitstring': '',
+                'sequence': '',
+                'energy': float('inf'),
+                'costs': costs
+            }
+
         repaired_bitstring = self._repair_with_marginals(probs)
         best_sequence = self.decode_solution(repaired_bitstring)
         best_energy = self.compute_energy_from_bitstring(repaired_bitstring)
@@ -95,12 +108,35 @@ class QAOASolver:
         print(f"✅ QAOA optimization completed!")
         print(f"➡️ Best sequence: {best_sequence} | Energy: {best_energy:.6f}")
 
+        # Plot the probability distribution with amino acid sequences
+        self.plot_prob_with_sequences(probs)
+
         return {
             'bitstring': repaired_bitstring,
             'sequence': best_sequence,
             'energy': best_energy,
             'costs': costs  # Return costs for plotting
         }
+
+    def plot_prob_with_sequences(self, probs: np.ndarray, top_k: int = 20):
+        """
+        Plots a bar chart of the top_k amino acid sequences and their probabilities.
+        """
+        # Sort the probabilities and get the top_k indices
+        sorted_indices = np.argsort(probs)[::-1][:top_k]
+        sorted_probs = probs[sorted_indices]
+        sequences = [self.decode_solution(format(idx, f'0{self.n_qubits}b')) for idx in sorted_indices]
+
+        plt.figure(figsize=(12, 6))
+        plt.bar(range(len(sequences)), sorted_probs, color='blue')
+        plt.xlabel('Amino Acid Sequences (Top ' + str(top_k) + ')')
+        plt.ylabel('Probability')
+        plt.title('Top Probability Distribution of Amino Acid Sequences from QAOA')
+        plt.xticks(range(len(sequences)), sequences, rotation=90)
+        plt.tight_layout()
+        plt.savefig('qaoa_probability_plot.png')  # Save to file instead of show
+        plt.close()  # Close the figure to avoid memory issues
+        print("Plot saved as qaoa_probability_plot.png")
 
     def _get_marginals(self, probs: np.ndarray) -> np.ndarray:
         """
@@ -162,7 +198,7 @@ class VQESolver:
     Manages the VQE circuit and optimization process with PennyLane.
     Uses a more expressive ansatz for potentially better results.
     """
-    def __init__(self, cost_hamiltonian, n_qubits, pauli_terms, amino_acids, L, bits_per_pos, layers=2):
+    def __init__(self, cost_hamiltonian, n_qubits, pauli_terms, amino_acids, L, bits_per_pos, layers=2, shots: int = 1000):
         self.cost_hamiltonian = cost_hamiltonian
         self.n_qubits = n_qubits
         self.pauli_terms = pauli_terms
@@ -170,7 +206,7 @@ class VQESolver:
         self.L = L
         self.bits_per_pos = bits_per_pos
         self.n_aa = len(amino_acids)
-        self.dev = qml.device('lightning.qubit', wires=self.n_qubits)
+        self.dev = qml.device('lightning.qubit', wires=self.n_qubits, shots=shots)  # Added shots parameter
         self.layers = layers  # Number of entangling layers
 
     def _vqe_ansatz(self, params):
@@ -221,6 +257,18 @@ class VQESolver:
             return qml.probs(wires=range(self.n_qubits))
 
         probs = prob_circuit()
+        print(f"Number of shots used: {self.dev.shots}")  # Debug shot count
+        print("Probabilities:", probs)  # Debug print
+        print("Number of probabilities:", len(probs))  # Debug print
+        if len(probs) == 0:
+            print("Warning: No probabilities computed. Check Hamiltonian or circuit.")
+            return {
+                'bitstring': '',
+                'sequence': '',
+                'energy': float('inf'),
+                'costs': costs
+            }
+
         repaired_bitstring = self._repair_with_marginals(probs)
         best_sequence = self.decode_solution(repaired_bitstring)
         best_energy = self.compute_energy_from_bitstring(repaired_bitstring)
@@ -228,12 +276,35 @@ class VQESolver:
         print(f"✅ VQE optimization completed!")
         print(f"➡️ Best sequence: {best_sequence} | Energy: {best_energy:.6f}")
 
+        # Plot the probability distribution with amino acid sequences
+        self.plot_prob_with_sequences(probs)
+
         return {
             'bitstring': repaired_bitstring,
             'sequence': best_sequence,
             'energy': best_energy,
             'costs': costs  # Return costs for plotting
         }
+
+    def plot_prob_with_sequences(self, probs: np.ndarray, top_k: int = 20):
+        """
+        Plots a bar chart of the top_k amino acid sequences and their probabilities.
+        """
+        # Sort the probabilities and get the top_k indices
+        sorted_indices = np.argsort(probs)[::-1][:top_k]
+        sorted_probs = probs[sorted_indices]
+        sequences = [self.decode_solution(format(idx, f'0{self.n_qubits}b')) for idx in sorted_indices]
+
+        plt.figure(figsize=(12, 6))
+        plt.bar(range(len(sequences)), sorted_probs, color='green')
+        plt.xlabel('Amino Acid Sequences (Top ' + str(top_k) + ')')
+        plt.ylabel('Probability')
+        plt.title('Top Probability Distribution of Amino Acid Sequences from VQE')
+        plt.xticks(range(len(sequences)), sequences, rotation=90)
+        plt.tight_layout()
+        plt.savefig('vqe_probability_plot.png')  # Save to file instead of show
+        plt.close()  # Close the figure to avoid memory issues
+        print("Plot saved as vqe_probability_plot.png")
 
     def _get_marginals(self, probs: np.ndarray) -> np.ndarray:
         marginals = np.zeros((self.L, self.n_aa))
@@ -256,6 +327,9 @@ class VQESolver:
         return repaired_bitstring
 
     def decode_solution(self, bitstring: str) -> str:
+        """
+        Decodes a binary string back into a protein sequence.
+        """
         decoded_sequence = ""
         for i in range(self.L):
             pos_code_str = bitstring[i*self.bits_per_pos:(i+1)*self.bits_per_pos]
@@ -267,6 +341,9 @@ class VQESolver:
         return decoded_sequence
 
     def compute_energy_from_bitstring(self, bitstring: str) -> float:
+        """
+        Calculates the energy of a bitstring solution using the classical Hamiltonian.
+        """
         energy = 0.0
         for coeff, pauli_string in self.pauli_terms:
             pauli_prod = 1.0
@@ -277,7 +354,7 @@ class VQESolver:
                     pauli_prod *= z_val
             energy += coeff * pauli_prod
         return energy
-        
+
 class ClassicalSolver:
     """
     Solves the QUBO classically by brute force enumeration.
@@ -331,10 +408,13 @@ class ClassicalSolver:
         
         print(f"✅ Classical brute-force completed!")
         print(f"➡️ Best sequence: {best_sequence} | Energy: {best_energy:.6f}")
-        
+
         return {
             'bitstring': best_bitstring,
             'sequence': best_sequence,
             'energy': best_energy,
-            'costs': []  # Empty list for compatibility with plotting
+            'costs': []  # Empty for classical
         }
+        
+        
+        

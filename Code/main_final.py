@@ -10,7 +10,7 @@ import argparse
 import sys
 
 # Clasico y helice a mas vecinos
-# Calculo estadistico de combinaciones posibles intentant hacer 4 qubits por posicion,  intentant juntar helices mas parecidos juntarlos
+# Calculo estadistico de combinaciones posibles intentant hacer 4 qubits por posicion, intentant juntar helices mas parecidos juntarlos
 # Also support Qiskit
 try:
     from qiskit import QuantumCircuit, ClassicalRegister, QuantumRegister
@@ -30,15 +30,14 @@ class QuantumProteinDesign:
     """
     
     def __init__(self, sequence_length: int, amino_acids: List[str] = None, 
-                 quantum_backend: str = 'pennylane',
-                 **kwargs):
-        
+                 quantum_backend: str = 'pennylane', shots: int = 1000, **kwargs):
         self.L = sequence_length
         self.amino_acids = amino_acids
         self.n_aa = len(amino_acids)
         self.bits_per_pos = max(1, int(np.ceil(np.log2(self.n_aa))))
         self.n_qubits = self.L * self.bits_per_pos
         self.backend = quantum_backend
+        self.shots = shots  # Default to 1000 shots
         self.kwargs = kwargs
         
         print("🧬 QUANTUM PROTEIN DESIGN SETUP 🧬")
@@ -47,6 +46,7 @@ class QuantumProteinDesign:
         print(f"Bits per position: {self.bits_per_pos}")
         print(f"Required qubits: {self.n_qubits}")
         print(f"Quantum backend: {self.backend}")
+        print(f"Number of shots: {self.shots}")
         print("="*50)
 
         from core.hamiltonian_builder import HamiltonianBuilder
@@ -67,7 +67,8 @@ class QuantumProteinDesign:
             pauli_terms=self.pauli_terms,
             amino_acids=self.amino_acids,
             L=self.L,
-            bits_per_pos=self.bits_per_pos
+            bits_per_pos=self.bits_per_pos,
+            shots=self.shots  # Pass shots to solver
         )
         self.classical_solver = ClassicalSolver(
             L=self.L,
@@ -76,6 +77,42 @@ class QuantumProteinDesign:
             pauli_terms=self.pauli_terms,
             amino_acids=self.amino_acids
         )
+
+    def decode_solution(self, bitstring: str) -> str:
+        """Decodes a binary string back into a protein sequence."""
+        decoded_sequence = ""
+        for i in range(self.L):
+            pos_code_str = bitstring[i*self.bits_per_pos:(i+1)*self.bits_per_pos]
+            pos_code_int = int(pos_code_str, 2)
+            if pos_code_int < self.n_aa:
+                decoded_sequence += self.amino_acids[pos_code_int]
+            else:
+                decoded_sequence += 'X'  # Violation or invalid code
+        return decoded_sequence
+
+    def plot_prob_with_sequences(self, probs: np.ndarray, solver_name: str, top_k: int = 20):
+        """
+        Plots a bar chart of the top_k amino acid sequences and their probabilities.
+        """
+        import matplotlib
+        matplotlib.use('Agg')  # Non-interactive backend
+        import matplotlib.pyplot as plt
+
+        # Sort the probabilities and get the top_k indices
+        sorted_indices = np.argsort(probs)[::-1][:top_k]
+        sorted_probs = probs[sorted_indices]
+        sequences = [self.decode_solution(format(idx, f'0{self.n_qubits}b')) for idx in sorted_indices]
+
+        plt.figure(figsize=(12, 6))
+        plt.bar(range(len(sequences)), sorted_probs, color='blue' if solver_name == 'QAOA' else 'green')
+        plt.xlabel('Amino Acid Sequences (Top ' + str(top_k) + ')')
+        plt.ylabel('Probability')
+        plt.title(f'Top Probability Distribution of Amino Acid Sequences from {solver_name}')
+        plt.xticks(range(len(sequences)), sequences, rotation=90)
+        plt.tight_layout()
+        plt.savefig(f'{solver_name.lower()}_probability_plot.png')  # Save to file
+        plt.close()  # Close the figure to avoid memory issues
+        print(f"Plot saved as {solver_name.lower()}_probability_plot.png")
 
     def solve_qaoa_pennylane(self, p_layers: int = 2, max_iterations: int = 200, n_starts: int = 4, init_strategy: str = 'linear', warm_start: bool = True) -> Dict[str, Any]:
         """Solve using QAOA with PennyLane"""
@@ -162,16 +199,32 @@ class QuantumProteinDesign:
             return qml.probs(wires=range(self.n_qubits))
         
         probs = get_probabilities(best_params)
+        print(f"Number of shots used: {self.qaoa_solver.dev.shots}")  # Debug shot count
+        print("Probabilities:", probs)  # Debug print
+        print("Number of probabilities:", len(probs))  # Debug print
+        if len(probs) == 0:
+            print("Warning: No probabilities computed. Check Hamiltonian or circuit.")
+            return {
+                'bitstring': '',
+                'energy': float('inf'),
+                'costs': best_costs_trace,
+                'repaired_sequence': '',
+                'repaired_cost': float('inf')
+            }
+
         best_bitstring_int = np.argmax(probs)
         best_bitstring = format(best_bitstring_int, f'0{self.n_qubits}b')
         repaired_solution = self.qaoa_solver._repair_with_marginals(probs)
-        repaired_sequence = self.qaoa_solver.decode_solution(repaired_solution)
+        repaired_sequence = self.decode_solution(repaired_solution)
         repaired_energy = self.qaoa_solver.compute_energy_from_bitstring(repaired_solution)
         
         print(f"✅ QAOA completed! Final cost: {best_cost:.6f}")
         print(f"Best solution probability: {max(probs):.4f}")
         print(f"➡️ Repaired sequence: {repaired_sequence} | Energy (classical): {repaired_energy:.6f}")
         
+        # Plot probability distribution with sequences
+        self.plot_prob_with_sequences(probs, "QAOA")
+
         return {
             'bitstring': best_bitstring,
             'energy': best_cost,
@@ -184,7 +237,8 @@ class QuantumProteinDesign:
         """Solve using VQE with PennyLane"""
         print(f"\n🔥 Solving with PennyLane VQE (layers={layers})...")
         
-        dev = self.qaoa_solver.dev  # Reuse device from QAOA solver
+        # Create a new device with the specified number of shots
+        dev = qml.device('lightning.qubit', wires=self.n_qubits, shots=self.shots)
         
         def make_cost():
             @qml.qnode(dev)
@@ -232,14 +286,30 @@ class QuantumProteinDesign:
             return qml.probs(wires=range(self.n_qubits))
         
         probs = get_probabilities(best_params)
+        print(f"Number of shots used: {dev.shots}")  # Debug shot count
+        print("Probabilities:", probs)  # Debug print
+        print("Number of probabilities:", len(probs))  # Debug print
+        if len(probs) == 0:
+            print("Warning: No probabilities computed. Check Hamiltonian or circuit.")
+            return {
+                'bitstring': '',
+                'energy': float('inf'),
+                'costs': best_costs_trace,
+                'repaired_sequence': '',
+                'repaired_cost': float('inf')
+            }
+
         repaired_solution = self.qaoa_solver._repair_with_marginals(probs)
-        repaired_sequence = self.qaoa_solver.decode_solution(repaired_solution)
+        repaired_sequence = self.decode_solution(repaired_solution)
         repaired_energy = self.qaoa_solver.compute_energy_from_bitstring(repaired_solution)
         
         print(f"✅ VQE completed! Final cost: {best_cost:.6f}")
         print(f"Best solution probability: {max(probs):.4f}")
         print(f"➡️ Repaired sequence: {repaired_sequence} | Energy (classical): {repaired_energy:.6f}")
         
+        # Plot probability distribution with sequences
+        self.plot_prob_with_sequences(probs, "VQE")
+
         return {
             'bitstring': repaired_solution,
             'energy': best_cost,
@@ -280,7 +350,8 @@ class QuantumProteinDesign:
         plt.ylabel('Energy')
         plt.title('Quantum Optimization Convergence')
         plt.grid(True, alpha=0.3)
-        plt.show()
+        plt.savefig('optimization_convergence.png')  # Save to file
+        plt.close()
 
     def plot_alpha_helix_wheel(self, sequence: str):
         polar = set(['S','T','N','Q','Y','C','G'])
@@ -341,15 +412,17 @@ class QuantumProteinDesign:
         ax.set_ylim(-1.3, 1.3)
         ax.axis('off')
         plt.title('Alpha-Helix Wheel')
-        plt.show()
+        plt.savefig('alpha_helix_wheel.png')  # Save to file
+        plt.close()
 
 def run_quantum_protein_design(sequence_length, amino_acids, quantum_backend='pennylane', 
-                               **kwargs):
+                               shots: int = 1000, **kwargs):
     
     designer = QuantumProteinDesign(
         sequence_length=sequence_length,
         amino_acids=amino_acids,
         quantum_backend=quantum_backend,
+        shots=shots,  # Pass shots to constructor
         **kwargs
     )
     
@@ -377,6 +450,7 @@ if __name__ == '__main__':
     parser.add_argument('-R', '--residues', type=str, default="V,Q,L,R", help='Amino acids to use, comma-separated.')
     parser.add_argument('-b', '--backend', type=str, default='pennylane', choices=['pennylane', 'qiskit'], help='Quantum backend to use.')
     parser.add_argument('--solver', type=str, default='qaoa', choices=['qaoa', 'vqe', 'classical'], help='Solver to use.')
+    parser.add_argument('--shots', type=int, default=1000, help='Number of shots for quantum simulation.')
     parser.add_argument('--membrane', type=str, help='Membrane span (e.g., 1:4)')
     parser.add_argument('--membrane_positions', type=str, help='Membrane positions (e.g., 0,2,5)')
     parser.add_argument('--membrane_mode', type=str, default='span', choices=['span', 'set', 'wheel'], help='Mode for defining membrane positions.')
@@ -422,6 +496,8 @@ if __name__ == '__main__':
     designer, qaoa_result = run_quantum_protein_design(
         sequence_length=args.length,
         amino_acids=aa_list,
+        quantum_backend=args.backend,
+        shots=args.shots,  # Pass shots from command line
         membrane_span=mem_span,
         membrane_charge=args.membrane_charge,
         lambda_charge=args.lambda_charge,
@@ -458,6 +534,5 @@ if __name__ == '__main__':
         sequence = qaoa_result.get('repaired_sequence', qaoa_result.get('sequence'))
         designer.plot_alpha_helix_wheel(sequence)
 
-
-#  python main_final.py -L 6 -R V,Q,A,N --lambda_pairwise 1.0 --lambda_helix_pairs 1.5 --lambda_env 2.0 --lambda_charge 1.5 --lambda_mu 1.0 --membrane_mode wheel --wheel_phase_deg 0 --wheel_halfwidth_deg 90
-# python main_final.py -L 6 -R V,A,N,S --lambda_pairwise 1.0 --lambda_helix_pairs 1.5 --membrane_mode wheel --wheel_phase_deg -90 --wheel_halfwidth_deg 90
+#  python main_final.py -L 6 -R V,Q,A,N --lambda_pairwise 1.0 --lambda_helix_pairs 1.5 --lambda_env 2.0 --lambda_charge 1.5 --lambda_mu 1.0 --membrane_mode wheel --wheel_phase_deg 0 --wheel_halfwidth_deg 90 --shots 1000
+# python main_final.py -L 6 -R V,A,N,S --lambda_pairwise 1.0 --lambda_helix_pairs 1.5 --membrane_mode wheel --wheel_phase_deg -90 --wheel_halfwidth_deg 90 --shots 1000
