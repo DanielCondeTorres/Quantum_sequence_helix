@@ -10,7 +10,7 @@ import argparse
 import sys
 
 # Clasico y helice a mas vecinos
-# Calculo estadistico de combinaciones posibles intentant hacer 4 qubits por posicion,  intentan juntar helices mas parecidos juntarlos
+# Calculo estadistico de combinaciones posibles intentant hacer 4 qubits por posicion,  intentant juntar helices mas parecidos juntarlos
 # Also support Qiskit
 try:
     from qiskit import QuantumCircuit, ClassicalRegister, QuantumRegister
@@ -180,6 +180,74 @@ class QuantumProteinDesign:
             'repaired_cost': repaired_energy
         }
 
+    def solve_vqe_pennylane(self, layers: int = 2, max_iterations: int = 200, n_starts: int = 4) -> Dict[str, Any]:
+        """Solve using VQE with PennyLane"""
+        print(f"\n🔥 Solving with PennyLane VQE (layers={layers})...")
+        
+        dev = self.qaoa_solver.dev  # Reuse device from QAOA solver
+        
+        def make_cost():
+            @qml.qnode(dev)
+            def _cost(params):
+                qml.StronglyEntanglingLayers(params, wires=range(self.n_qubits))
+                return qml.expval(self.cost_hamiltonian)
+            return _cost
+        
+        cost_function = make_cost()
+        
+        shape = qml.StronglyEntanglingLayers.shape(n_layers=layers, n_wires=self.n_qubits)
+        
+        best_cost = np.inf
+        best_params = None
+        best_costs_trace = []
+        
+        for start in range(n_starts):
+            params = qnp.random.uniform(0, 2 * np.pi, shape, requires_grad=True)
+            optimizer = qml.AdamOptimizer(stepsize=0.1)
+            costs = []
+            for i in range(max_iterations // 2):
+                params, cost = optimizer.step_and_cost(cost_function, params)
+                costs.append(cost)
+            optimizer_fine = qml.AdamOptimizer(stepsize=0.02)
+            for i in range(max_iterations // 2, max_iterations):
+                params, cost = optimizer_fine.step_and_cost(cost_function, params)
+                costs.append(cost)
+            
+            print(f"Start {start+1}/{n_starts}: final cost {costs[-1]:.6f}")
+            if costs[-1] < best_cost:
+                best_cost = costs[-1]
+                best_params = params
+                best_costs_trace = costs
+        
+        try:
+            fig, ax = qml.draw_mpl(cost_function, show_all_wires=True)(best_params)
+            fig.suptitle("VQE Optimized Circuit")
+            plt.show()
+        except Exception as e:
+            print(f"Could not render matplotlib circuit: {e}")
+        
+        @qml.qnode(dev)
+        def get_probabilities(params):
+            qml.StronglyEntanglingLayers(params, wires=range(self.n_qubits))
+            return qml.probs(wires=range(self.n_qubits))
+        
+        probs = get_probabilities(best_params)
+        repaired_solution = self.qaoa_solver._repair_with_marginals(probs)
+        repaired_sequence = self.qaoa_solver.decode_solution(repaired_solution)
+        repaired_energy = self.qaoa_solver.compute_energy_from_bitstring(repaired_solution)
+        
+        print(f"✅ VQE completed! Final cost: {best_cost:.6f}")
+        print(f"Best solution probability: {max(probs):.4f}")
+        print(f"➡️ Repaired sequence: {repaired_sequence} | Energy (classical): {repaired_energy:.6f}")
+        
+        return {
+            'bitstring': repaired_solution,
+            'energy': best_cost,
+            'costs': best_costs_trace,
+            'repaired_sequence': repaired_sequence,
+            'repaired_cost': repaired_energy
+        }
+
     def solve_classical_qubo(self) -> Dict[str, Any]:
         result = self.classical_solver.solve()
         return result
@@ -285,8 +353,11 @@ def run_quantum_protein_design(sequence_length, amino_acids, quantum_backend='pe
         **kwargs
     )
     
-    if kwargs.get('classical', False):
+    solver = kwargs.get('solver', 'qaoa')
+    if solver == 'classical':
         result = designer.solve_classical_qubo()
+    elif solver == 'vqe':
+        result = designer.solve_vqe_pennylane()
     else:
         result = designer.solve_qaoa_pennylane()
     
@@ -295,7 +366,8 @@ def run_quantum_protein_design(sequence_length, amino_acids, quantum_backend='pe
     if violations > 0:
         print(f"⚠️ Warning: Solution contains {violations} constraint violations ('X' residues).")
     
-    designer.plot_optimization(result['costs'])
+    if 'costs' in result:
+        designer.plot_optimization(result['costs'])
     
     return designer, result
 
@@ -304,6 +376,7 @@ if __name__ == '__main__':
     parser.add_argument('-L', '--length', type=int, default=4, help='Sequence length.')
     parser.add_argument('-R', '--residues', type=str, default="V,Q,L,R", help='Amino acids to use, comma-separated.')
     parser.add_argument('-b', '--backend', type=str, default='pennylane', choices=['pennylane', 'qiskit'], help='Quantum backend to use.')
+    parser.add_argument('--solver', type=str, default='qaoa', choices=['qaoa', 'vqe', 'classical'], help='Solver to use.')
     parser.add_argument('--membrane', type=str, help='Membrane span (e.g., 1:4)')
     parser.add_argument('--membrane_positions', type=str, help='Membrane positions (e.g., 0,2,5)')
     parser.add_argument('--membrane_mode', type=str, default='span', choices=['span', 'set', 'wheel'], help='Mode for defining membrane positions.')
@@ -317,7 +390,6 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_helix_pairs', type=float, default=0.0, help='Weight of the helix pair propensity term.')
     parser.add_argument('--max_interaction_dist', type=int, default=3, help='Maximum sequence distance for pairwise interactions.')
     parser.add_argument('--membrane_charge', type=str, default='neu', choices=['neu', 'neg', 'pos'], help='Charge of the membrane.')
-    parser.add_argument('--classical', action='store_true', help='Solve using classical brute-force instead of quantum.')
     
     args = parser.parse_args()
     
@@ -363,26 +435,29 @@ if __name__ == '__main__':
         membrane_mode=args.membrane_mode,
         wheel_phase_deg=args.wheel_phase_deg,
         wheel_halfwidth_deg=args.wheel_halfwidth_deg,
-        classical=args.classical,
+        solver=args.solver,
     )
     
     # Show the results
     print("Optimization complete!")
     
-    if args.classical:
+    if args.solver == 'classical':
         print("\n🏆 Solución Clásica:")
         print(f"Secuencia: {qaoa_result['sequence']}")
         print(f"Energía: {qaoa_result['energy']:.6f}")
+    elif args.solver == 'vqe':
+        print("\n⚛️ Solución Cuántica (VQE):")
+        print(f"Secuencia Reparada: {qaoa_result['repaired_sequence']}")
+        print(f"Energía Final: {qaoa_result['repaired_cost']:.6f}")
     else:
         print("\n⚛️ Solución Cuántica (QAOA):")
         print(f"Secuencia Reparada: {qaoa_result['repaired_sequence']}")
         print(f"Energía Final: {qaoa_result['repaired_cost']:.6f}")
 
     if args.membrane_mode == 'wheel' and qaoa_result:
-        designer.plot_alpha_helix_wheel(qaoa_result['repaired_sequence'])
-    
-# python cursor_peptide_seq.py -L 6 -R VQ  --membrane_mode wheel --wheel_phase_deg 0 --wheel_halfwidth_deg 30  --lambda_env 0.6 --lambda_mu 0.4 --lambda_charge 0.3 --membrane_charge neg
+        sequence = qaoa_result.get('repaired_sequence', qaoa_result.get('sequence'))
+        designer.plot_alpha_helix_wheel(sequence)
 
 
-
-# python main_final.py -L 6 -R V,Q,N,S --lambda_pairwise 0.5  --lambda_helix_pairs 0.5  --lambda_env 5.0  --lambda_local 0.2 --membrane_mode wheel --wheel_phase_deg 0 --wheel_halfwidth_deg 90
+#  python main_final.py -L 6 -R V,Q,A,N --lambda_pairwise 1.0 --lambda_helix_pairs 1.5 --lambda_env 2.0 --lambda_charge 1.5 --lambda_mu 1.0 --membrane_mode wheel --wheel_phase_deg 0 --wheel_halfwidth_deg 90
+# python main_final.py -L 6 -R V,A,N,S --lambda_pairwise 1.0 --lambda_helix_pairs 1.5 --membrane_mode wheel --wheel_phase_deg -90 --wheel_halfwidth_deg 90

@@ -7,23 +7,106 @@ import itertools
 class QAOASolver:
     """
     Manages the QAOA circuit and optimization process with PennyLane.
+    Improved with multi-layer support, warm-start initialization, and native PennyLane optimizer.
     """
-    def __init__(self, cost_hamiltonian, n_qubits, pauli_terms, amino_acids, L, bits_per_pos):
+    def __init__(self, cost_hamiltonian, n_qubits, pauli_terms, amino_acids, L, bits_per_pos, layers=1, warm_start=False):
         self.cost_hamiltonian = cost_hamiltonian
         self.n_qubits = n_qubits
         self.pauli_terms = pauli_terms
         self.amino_acids = amino_acids
         self.L = L
         self.bits_per_pos = bits_per_pos
-        self.n_aa = len(amino_acids) # <--- Esta línea faltaba
+        self.n_aa = len(amino_acids)
         self.dev = qml.device('lightning.qubit', wires=self.n_qubits)
+        self.layers = layers  # Number of QAOA layers (p)
+        self.warm_start = warm_start  # Option for warm-start initialization
+
+    def _qaoa_circuit(self, params):
+        """
+        Defines the QAOA circuit with p layers.
+        """
+        gammas = params[:self.layers]
+        betas = params[self.layers:]
+        
+        # Initial state: uniform superposition
+        for i in range(self.n_qubits):
+            qml.Hadamard(wires=i)
+        
+        # QAOA layers
+        for p in range(self.layers):
+            # Cost layer
+            qml.templates.ApproximateTimeEvolution(self.cost_hamiltonian, gammas[p], n=1)
+            # Mixer layer
+            for i in range(self.n_qubits):
+                qml.RX(2 * betas[p], wires=i)
+
+    def _cost_function(self, params):
+        @qml.qnode(self.dev)
+        def circuit():
+            self._qaoa_circuit(params)
+            return qml.expval(self.cost_hamiltonian)
+        return circuit()
+
+    def _initialize_params(self):
+        """
+        Initialize QAOA parameters, with optional warm-start.
+        """
+        if self.warm_start:
+            # Simple warm-start: small values for gammas, pi/4 for betas
+            gammas = qnp.random.uniform(0.01, 0.1, self.layers)
+            betas = qnp.full(self.layers, np.pi / 4)
+        else:
+            gammas = qnp.random.uniform(0, np.pi, self.layers)
+            betas = qnp.random.uniform(0, np.pi / 2, self.layers)
+        return qnp.concatenate([gammas, betas])
+
+    def solve(self, steps=100, learning_rate=0.1) -> Dict[str, Any]:
+        """
+        Optimizes the QAOA parameters using PennyLane's Adam optimizer.
+        """
+        print("\n🚀 Solving with Improved QAOA...")
+        params = self._initialize_params()
+        optimizer = qml.AdamOptimizer(stepsize=learning_rate)
+
+        min_energy = float('inf')
+        best_params = params
+        costs = []
+
+        for i in range(steps):
+            params, cost = optimizer.step_and_cost(self._cost_function, params)
+            costs.append(cost)
+            if cost < min_energy:
+                min_energy = cost
+                best_params = params
+            if i % 10 == 0:
+                print(f"Step {i}: Energy = {cost:.6f}")
+
+        # Sample from the optimized circuit to get probabilities
+        @qml.qnode(self.dev)
+        def prob_circuit():
+            self._qaoa_circuit(best_params)
+            return qml.probs(wires=range(self.n_qubits))
+
+        probs = prob_circuit()
+        repaired_bitstring = self._repair_with_marginals(probs)
+        best_sequence = self.decode_solution(repaired_bitstring)
+        best_energy = self.compute_energy_from_bitstring(repaired_bitstring)
+
+        print(f"✅ QAOA optimization completed!")
+        print(f"➡️ Best sequence: {best_sequence} | Energy: {best_energy:.6f}")
+
+        return {
+            'bitstring': repaired_bitstring,
+            'sequence': best_sequence,
+            'energy': best_energy,
+            'costs': costs  # Return costs for plotting
+        }
 
     def _get_marginals(self, probs: np.ndarray) -> np.ndarray:
         """
         Calculates the marginal probabilities for each amino acid at each position.
         """
         marginals = np.zeros((self.L, self.n_aa))
-        n_aa = self.n_aa
         for bitstring_int in range(len(probs)):
             bitstring = format(bitstring_int, f'0{self.n_qubits}b')
             sequence_code = []
@@ -32,7 +115,7 @@ class QAOASolver:
                 pos_code_int = int(pos_code_str, 2)
                 sequence_code.append(pos_code_int)
             for i in range(self.L):
-                if sequence_code[i] < n_aa:
+                if sequence_code[i] < self.n_aa:
                     marginals[i, sequence_code[i]] += probs[bitstring_int]
         return marginals
 
@@ -56,13 +139,134 @@ class QAOASolver:
             if pos_code_int < self.n_aa:
                 decoded_sequence += self.amino_acids[pos_code_int]
             else:
-                decoded_sequence += 'X' # Violation or invalid code
+                decoded_sequence += 'X'  # Violation or invalid code
         return decoded_sequence
 
     def compute_energy_from_bitstring(self, bitstring: str) -> float:
         """
         Calculates the energy of a bitstring solution using the classical Hamiltonian.
         """
+        energy = 0.0
+        for coeff, pauli_string in self.pauli_terms:
+            pauli_prod = 1.0
+            for i, pauli in enumerate(pauli_string):
+                if pauli == 'Z':
+                    qubit_val = int(bitstring[i])
+                    z_val = 1 if qubit_val == 0 else -1
+                    pauli_prod *= z_val
+            energy += coeff * pauli_prod
+        return energy
+
+class VQESolver:
+    """
+    Manages the VQE circuit and optimization process with PennyLane.
+    Uses a more expressive ansatz for potentially better results.
+    """
+    def __init__(self, cost_hamiltonian, n_qubits, pauli_terms, amino_acids, L, bits_per_pos, layers=2):
+        self.cost_hamiltonian = cost_hamiltonian
+        self.n_qubits = n_qubits
+        self.pauli_terms = pauli_terms
+        self.amino_acids = amino_acids
+        self.L = L
+        self.bits_per_pos = bits_per_pos
+        self.n_aa = len(amino_acids)
+        self.dev = qml.device('lightning.qubit', wires=self.n_qubits)
+        self.layers = layers  # Number of entangling layers
+
+    def _vqe_ansatz(self, params):
+        """
+        Defines the VQE ansatz using StronglyEntanglingLayers for expressivity.
+        """
+        qml.templates.StronglyEntanglingLayers(params, wires=range(self.n_qubits))
+
+    def _cost_function(self, params):
+        @qml.qnode(self.dev)
+        def circuit():
+            self._vqe_ansatz(params)
+            return qml.expval(self.cost_hamiltonian)
+        return circuit()
+
+    def _initialize_params(self):
+        """
+        Initialize VQE parameters.
+        """
+        shape = qml.templates.StronglyEntanglingLayers.shape(n_layers=self.layers, n_wires=self.n_qubits)
+        return qnp.random.uniform(0, 2 * np.pi, shape)
+
+    def solve(self, steps=200, learning_rate=0.1) -> Dict[str, Any]:
+        """
+        Optimizes the VQE parameters using PennyLane's Adam optimizer.
+        """
+        print("\n🔬 Solving with VQE...")
+        params = self._initialize_params()
+        optimizer = qml.AdamOptimizer(stepsize=learning_rate)
+
+        min_energy = float('inf')
+        best_params = params
+        costs = []
+
+        for i in range(steps):
+            params, cost = optimizer.step_and_cost(self._cost_function, params)
+            costs.append(cost)
+            if cost < min_energy:
+                min_energy = cost
+                best_params = params
+            if i % 20 == 0:
+                print(f"Step {i}: Energy = {cost:.6f}")
+
+        # Sample from the optimized circuit to get probabilities
+        @qml.qnode(self.dev)
+        def prob_circuit():
+            self._vqe_ansatz(best_params)
+            return qml.probs(wires=range(self.n_qubits))
+
+        probs = prob_circuit()
+        repaired_bitstring = self._repair_with_marginals(probs)
+        best_sequence = self.decode_solution(repaired_bitstring)
+        best_energy = self.compute_energy_from_bitstring(repaired_bitstring)
+
+        print(f"✅ VQE optimization completed!")
+        print(f"➡️ Best sequence: {best_sequence} | Energy: {best_energy:.6f}")
+
+        return {
+            'bitstring': repaired_bitstring,
+            'sequence': best_sequence,
+            'energy': best_energy,
+            'costs': costs  # Return costs for plotting
+        }
+
+    def _get_marginals(self, probs: np.ndarray) -> np.ndarray:
+        marginals = np.zeros((self.L, self.n_aa))
+        for bitstring_int in range(len(probs)):
+            bitstring = format(bitstring_int, f'0{self.n_qubits}b')
+            sequence_code = []
+            for i in range(self.L):
+                pos_code_str = bitstring[i*self.bits_per_pos:(i+1)*self.bits_per_pos]
+                pos_code_int = int(pos_code_str, 2)
+                sequence_code.append(pos_code_int)
+            for i in range(self.L):
+                if sequence_code[i] < self.n_aa:
+                    marginals[i, sequence_code[i]] += probs[bitstring_int]
+        return marginals
+
+    def _repair_with_marginals(self, probs: np.ndarray) -> str:
+        marginals = self._get_marginals(probs)
+        repaired_sequence_code = np.argmax(marginals, axis=1)
+        repaired_bitstring = ''.join(format(c, f'0{self.bits_per_pos}b') for c in repaired_sequence_code)
+        return repaired_bitstring
+
+    def decode_solution(self, bitstring: str) -> str:
+        decoded_sequence = ""
+        for i in range(self.L):
+            pos_code_str = bitstring[i*self.bits_per_pos:(i+1)*self.bits_per_pos]
+            pos_code_int = int(pos_code_str, 2)
+            if pos_code_int < self.n_aa:
+                decoded_sequence += self.amino_acids[pos_code_int]
+            else:
+                decoded_sequence += 'X'
+        return decoded_sequence
+
+    def compute_energy_from_bitstring(self, bitstring: str) -> float:
         energy = 0.0
         for coeff, pauli_string in self.pauli_terms:
             pauli_prod = 1.0
@@ -131,5 +335,6 @@ class ClassicalSolver:
         return {
             'bitstring': best_bitstring,
             'sequence': best_sequence,
-            'energy': best_energy
+            'energy': best_energy,
+            'costs': []  # Empty list for compatibility with plotting
         }

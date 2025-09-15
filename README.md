@@ -40,8 +40,7 @@ Clone the repository and create the environment using **conda**:
 git clone https://github.com/DanielCondeTorres/Quantum_sequence_helix.git
 cd Quantum_sequence_helix
 conda env create -f environment.yml
-conda activate quantum_protein 
-
+conda activate quantum_protein_design
 
 ## Usage
 
