@@ -8,7 +8,9 @@ from typing import Dict, List, Tuple, Optional, Any
 import itertools
 import argparse
 import sys
-
+import time
+from core.hamiltonian_builder import HamiltonianBuilder
+from core.solvers import QAOASolver, ClassicalSolver
 # Clasico y helice a mas vecinos
 # Calculo estadistico de combinaciones posibles intentant hacer 4 qubits por posicion, intentant juntar helices mas parecidos juntarlos
 # Also support Qiskit
@@ -387,7 +389,7 @@ class QuantumProteinDesign:
         try:
             if self.kwargs.get('membrane_mode', 'span') == 'wheel':
                 phase = np.deg2rad(self.kwargs.get('wheel_phase_deg', 0.0))
-                halfw = np.deg2rad(self.kwargs.get('wheel_halfwidth_deg', 40.0))
+                halfw = np.deg2rad(self.kwargs.get('wheel_halfwidth_deg', 80.0))  # ¡Cambiado a 80.0 para consistencia!
                 for sign in [+1, -1]:
                     ang = sign * halfw
                     x = radius * np.cos(ang)
@@ -417,6 +419,22 @@ class QuantumProteinDesign:
 
 def run_quantum_protein_design(sequence_length, amino_acids, quantum_backend='pennylane', 
                                shots: int = 1000, **kwargs):
+    # DEBUG: Imprime asignaciones de env para verificar shifts
+    L = sequence_length
+    phase = kwargs.get('wheel_phase_deg', 0.0)
+    halfwidth = kwargs.get('wheel_halfwidth_deg', 80.0)
+    print(f"\nDEBUG ENV (phase={phase}°, halfwidth={halfwidth}°):")
+    mem_pos, water_pos = [], []
+    for i in range(L):
+        angle = (i * 100.0 + phase) % 360.0
+        if angle > 180: angle -= 360
+        env = "membrane" if abs(angle) <= halfwidth else "water"
+        if env == "membrane":
+            mem_pos.append(i)
+        else:
+            water_pos.append(i)
+        print(f"Pos {i}: angle={angle:.1f}° → {env}")
+    print(f"Membrana: {mem_pos} | Agua: {water_pos}")
     
     designer = QuantumProteinDesign(
         sequence_length=sequence_length,
@@ -454,15 +472,15 @@ if __name__ == '__main__':
     parser.add_argument('--membrane', type=str, help='Membrane span (e.g., 1:4)')
     parser.add_argument('--membrane_positions', type=str, help='Membrane positions (e.g., 0,2,5)')
     parser.add_argument('--membrane_mode', type=str, default='span', choices=['span', 'set', 'wheel'], help='Mode for defining membrane positions.')
-    parser.add_argument('--wheel_phase_deg', type=float, default=0.0, help='Phase angle for helical wheel in degrees.')
-    parser.add_argument('--wheel_halfwidth_deg', type=float, default=90.0, help='Half-width of the membrane sector in degrees for helical wheel.')
-    parser.add_argument('--lambda_env', type=float, default=0.0, help='Weight of the environment preference term.')
+    parser.add_argument('--wheel_phase_deg', type=float, default=0.0, help='Phase angle for helical wheel in degrees.')  # ¡Cambiado default a 0.0!
+    parser.add_argument('--wheel_halfwidth_deg', type=float, default=80.0, help='Half-width of the membrane sector in degrees for helical wheel.')  # ¡Cambiado a 80.0 para sensibilidad!
+    parser.add_argument('--lambda_env', type=float, default=4.0, help='Weight of the environment preference term.')
     parser.add_argument('--lambda_charge', type=float, default=0.0, help='Weight of the membrane charge term.')
     parser.add_argument('--lambda_mu', type=float, default=0.0, help='Weight of the hydrophobic moment term.')
-    parser.add_argument('--lambda_local', type=float, default=1.0, help='Weight of the local preference terms.')
-    parser.add_argument('--lambda_pairwise', type=float, default=1.0, help='Weight of the pairwise interaction term (Miyazawa-Jernigan).')
+    parser.add_argument('--lambda_local', type=float, default=0.0, help='Weight of the local preference terms.')
+    parser.add_argument('--lambda_pairwise', type=float, default=0.0, help='Weight of the pairwise interaction term (Miyazawa-Jernigan).')
     parser.add_argument('--lambda_helix_pairs', type=float, default=0.0, help='Weight of the helix pair propensity term.')
-    parser.add_argument('--max_interaction_dist', type=int, default=3, help='Maximum sequence distance for pairwise interactions.')
+    parser.add_argument('--max_interaction_dist', type=int, default=4, help='Maximum sequence distance for pairwise interactions.')
     parser.add_argument('--membrane_charge', type=str, default='neu', choices=['neu', 'neg', 'pos'], help='Charge of the membrane.')
     
     args = parser.parse_args()
@@ -493,6 +511,8 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # Run the quantum protein design
+    start_time = time.time() # Start timer
+
     designer, qaoa_result = run_quantum_protein_design(
         sequence_length=args.length,
         amino_acids=aa_list,
@@ -513,7 +533,8 @@ if __name__ == '__main__':
         wheel_halfwidth_deg=args.wheel_halfwidth_deg,
         solver=args.solver,
     )
-    
+    end_time = time.time() # End timer
+    execution_time = end_time - start_time # Calculate duration 
     # Show the results
     print("Optimization complete!")
     
@@ -533,6 +554,8 @@ if __name__ == '__main__':
     if args.membrane_mode == 'wheel' and qaoa_result:
         sequence = qaoa_result.get('repaired_sequence', qaoa_result.get('sequence'))
         designer.plot_alpha_helix_wheel(sequence)
-
-#  python main_final.py -L 6 -R V,Q,A,N --lambda_pairwise 1.0 --lambda_helix_pairs 1.5 --lambda_env 2.0 --lambda_charge 1.5 --lambda_mu 1.0 --membrane_mode wheel --wheel_phase_deg 0 --wheel_halfwidth_deg 90 --shots 1000
-# python main_final.py -L 6 -R V,A,N,S --lambda_pairwise 1.0 --lambda_helix_pairs 1.5 --membrane_mode wheel --wheel_phase_deg -90 --wheel_halfwidth_deg 90 --shots 1000
+    # Log the execution time and solver to a file
+    log_entry = f"Solver: {args.solver} | Execution Time: {execution_time:.4f} seconds | Phase: {args.wheel_phase_deg}° | Halfwidth: {args.wheel_halfwidth_deg}° | Sequence: {qaoa_result.get('repaired_sequence', qaoa_result.get('sequence', ''))}\n"
+    with open("execution_log.txt", "a") as log_file:
+        log_file.write(log_entry)
+    print(f"\nExecution time logged to execution_log.txt")

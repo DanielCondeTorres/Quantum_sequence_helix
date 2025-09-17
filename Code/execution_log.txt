@@ -1,0 +1,15 @@
+Solver: qaoa | Execution Time: 48.6326 seconds
+Solver: qaoa | Execution Time: 42.4335 seconds
+Solver: qaoa | Execution Time: 44.4036 seconds
+Solver: qaoa | Execution Time: 42.2119 seconds
+Solver: qaoa | Execution Time: 42.8980 seconds
+Solver: qaoa | Execution Time: 42.1408 seconds | Phase: 45.0° | Halfwidth: 90.0° | Sequence: VQQVVQ
+Solver: qaoa | Execution Time: 41.6556 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: VQQVVQ
+Solver: qaoa | Execution Time: 9.5878 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: QVVQQV
+Solver: qaoa | Execution Time: 8.6742 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: VQQVVQ
+Solver: qaoa | Execution Time: 8.9331 seconds | Phase: 45.0° | Halfwidth: 90.0° | Sequence: VQQVVQ
+Solver: qaoa | Execution Time: 8.7274 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: VQQVVQ
+Solver: qaoa | Execution Time: 8.6261 seconds | Phase: 90.0° | Halfwidth: 90.0° | Sequence: VQVVQQ
+Solver: qaoa | Execution Time: 9.0980 seconds | Phase: 90.0° | Halfwidth: 90.0° | Sequence: VVQQVV
+Solver: qaoa | Execution Time: 8.8952 seconds | Phase: 45.0° | Halfwidth: 90.0° | Sequence: VVQQVQ
+Solver: qaoa | Execution Time: 8.9306 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: VQQVVQ

@@ -31,7 +31,10 @@ def _parse_energy_matrix(matrix: np.ndarray) -> np.ndarray:
             energy_matrix[row-1, col-1] = float(matrix[row, col])
     return energy_matrix
 
-def _load_energy_matrix_file() -> Tuple[np.ndarray, List[str]]:
+
+# _load_first_neighbors_matrix_file, _load_third_neighbors_matrix_file, _load_fourth_neighbors_matrix_file
+
+def  _load_energy_matrix_file() -> Tuple[np.ndarray, List[str]]:
     """Loads the Miyazawa-Jernigan interaction energy matrix from file."""
     path = _construct_resource_path("mj_matrix.txt")
     
@@ -51,9 +54,56 @@ def _load_energy_matrix_file() -> Tuple[np.ndarray, List[str]]:
     except Exception as e:
         raise Exception(f"Error loading Miyazawa-Jernigan matrix: {e}")
 
-def _load_helix_pairs_matrix_file() -> Tuple[np.ndarray, List[str]]:
+def _load_first_neighbors_matrix_file() -> Tuple[np.ndarray, List[str]]:
     """Returns the helix pairs propensity matrix from file."""
     path = _construct_resource_path("helix_pairs_prop.txt")
+    
+    try:
+        with open(path, 'r') as f:
+            lines = f.readlines()
+            
+            # The first line contains the symbols
+            symbols = lines[0].strip().split()
+            
+            # The rest of lines contain the matrix data
+            data_lines = [line.strip() for line in lines[1:]]
+            helix_matrix = np.loadtxt(data_lines, dtype=float)
+            
+        return helix_matrix, symbols
+    
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Error: The file {path} was not found. Check the path and filename.")
+    except Exception as e:
+        raise Exception(f"Error loading helix pairs matrix: {e}")
+    
+    
+    
+def _load_third_neighbors_matrix_file() -> Tuple[np.ndarray, List[str]]:
+    """Returns the helix pairs propensity matrix from file."""
+    path = _construct_resource_path("helix_sd_i_3.txt")
+    
+    try:
+        with open(path, 'r') as f:
+            lines = f.readlines()
+            
+            # The first line contains the symbols
+            symbols = lines[0].strip().split()
+            
+            # The rest of lines contain the matrix data
+            data_lines = [line.strip() for line in lines[1:]]
+            helix_matrix = np.loadtxt(data_lines, dtype=float)
+            
+        return helix_matrix, symbols
+    
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Error: The file {path} was not found. Check the path and filename.")
+    except Exception as e:
+        raise Exception(f"Error loading helix pairs matrix: {e}")
+ 
+ 
+def _load_fourth_neighbors_matrix_file() -> Tuple[np.ndarray, List[str]]:
+    """Returns the helix pairs propensity matrix from file."""
+    path = _construct_resource_path("helix_sd_i_4.txt")
     
     try:
         with open(path, 'r') as f:
