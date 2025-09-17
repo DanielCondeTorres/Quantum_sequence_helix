@@ -21,3 +21,4 @@ Solver: qaoa | Execution Time: 54.0714 seconds | Phase: 60.0° | Halfwidth: 90.0
 Solver: qaoa | Execution Time: 70.0753 seconds | Phase: 60.0° | Halfwidth: 90.0° | Sequence: VVQQVV
 Solver: qaoa | Execution Time: 53.8940 seconds | Phase: 90.0° | Halfwidth: 90.0° | Sequence: VVQQVV
 Solver: qaoa | Execution Time: 54.0794 seconds | Phase: -90.0° | Halfwidth: 60.0° | Sequence: QQVVQQ
+Solver: qaoa | Execution Time: 89.0151 seconds | Phase: 90.0° | Halfwidth: 80.0° | Sequence: QVQQVV
