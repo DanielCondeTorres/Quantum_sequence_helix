@@ -482,7 +482,7 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_helix_pairs', type=float, default=0.5, help='Weight of the helix pair propensity term.')
     parser.add_argument('--max_interaction_dist', type=int, default=4, help='Maximum sequence distance for pairwise interactions.')
     parser.add_argument('--membrane_charge', type=str, default='neu', choices=['neu', 'neg', 'pos'], help='Charge of the membrane.')
-    
+    parser.add_argument('--lambda_electrostatic', type=float, default=0.5, help='Weight of the electrostatics term.')
     args = parser.parse_args()
     
     aa_list = ["A", "R", "N", "D", "C", "E", "Q", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V"]
