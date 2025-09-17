@@ -13,3 +13,11 @@ Solver: qaoa | Execution Time: 8.6261 seconds | Phase: 90.0° | Halfwidth: 90.0�
 Solver: qaoa | Execution Time: 9.0980 seconds | Phase: 90.0° | Halfwidth: 90.0° | Sequence: VVQQVV
 Solver: qaoa | Execution Time: 8.8952 seconds | Phase: 45.0° | Halfwidth: 90.0° | Sequence: VVQQVQ
 Solver: qaoa | Execution Time: 8.9306 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: VQQVVQ
+Solver: qaoa | Execution Time: 42.3561 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: QVVQQV
+Solver: qaoa | Execution Time: 8.7844 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: VQQVVQ
+Solver: qaoa | Execution Time: 29.9694 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: VQQVVQ
+Solver: qaoa | Execution Time: 53.6931 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: VQQVVQ
+Solver: qaoa | Execution Time: 54.0714 seconds | Phase: 60.0° | Halfwidth: 90.0° | Sequence: QQQQVV
+Solver: qaoa | Execution Time: 70.0753 seconds | Phase: 60.0° | Halfwidth: 90.0° | Sequence: VVQQVV
+Solver: qaoa | Execution Time: 53.8940 seconds | Phase: 90.0° | Halfwidth: 90.0° | Sequence: VVQQVV
+Solver: qaoa | Execution Time: 54.0794 seconds | Phase: -90.0° | Halfwidth: 60.0° | Sequence: QQVVQQ

@@ -475,11 +475,11 @@ if __name__ == '__main__':
     parser.add_argument('--wheel_phase_deg', type=float, default=0.0, help='Phase angle for helical wheel in degrees.')  # ¡Cambiado default a 0.0!
     parser.add_argument('--wheel_halfwidth_deg', type=float, default=80.0, help='Half-width of the membrane sector in degrees for helical wheel.')  # ¡Cambiado a 80.0 para sensibilidad!
     parser.add_argument('--lambda_env', type=float, default=4.0, help='Weight of the environment preference term.')
-    parser.add_argument('--lambda_charge', type=float, default=0.0, help='Weight of the membrane charge term.')
-    parser.add_argument('--lambda_mu', type=float, default=0.0, help='Weight of the hydrophobic moment term.')
-    parser.add_argument('--lambda_local', type=float, default=0.0, help='Weight of the local preference terms.')
-    parser.add_argument('--lambda_pairwise', type=float, default=0.0, help='Weight of the pairwise interaction term (Miyazawa-Jernigan).')
-    parser.add_argument('--lambda_helix_pairs', type=float, default=0.0, help='Weight of the helix pair propensity term.')
+    parser.add_argument('--lambda_charge', type=float, default=0.5, help='Weight of the membrane charge term.')
+    parser.add_argument('--lambda_mu', type=float, default=0.5, help='Weight of the hydrophobic moment term.')
+    parser.add_argument('--lambda_local', type=float, default=0.5, help='Weight of the local preference terms.')
+    parser.add_argument('--lambda_pairwise', type=float, default=0.5, help='Weight of the pairwise interaction term (Miyazawa-Jernigan).')
+    parser.add_argument('--lambda_helix_pairs', type=float, default=0.5, help='Weight of the helix pair propensity term.')
     parser.add_argument('--max_interaction_dist', type=int, default=4, help='Maximum sequence distance for pairwise interactions.')
     parser.add_argument('--membrane_charge', type=str, default='neu', choices=['neu', 'neg', 'pos'], help='Charge of the membrane.')
     

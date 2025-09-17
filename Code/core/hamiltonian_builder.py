@@ -279,24 +279,33 @@ class HamiltonianBuilder:
         """Enhanced hydrophobic moment using normalized properties"""
         print("\nDEBUG: Adding enhanced hydrophobic moment terms (normalized)...")
         phi = np.deg2rad(100.0)
+        phase_deg = self.kwargs.get('wheel_phase_deg', 0.0)
+        phase_rad = np.deg2rad(phase_deg)
         for i in range(self.L):
             for j in range(self.L):
                 if i == j or abs(i - j) > 7:
                     continue
                 angle_i = phi * i
                 angle_j = phi * j
-                cos_i = np.cos(angle_i)
-                sin_i = np.sin(angle_i)
-                cos_j = np.cos(angle_j)
-                sin_j = np.sin(angle_j)
-                alignment = cos_i * cos_j + sin_i * sin_j
+                alignment = np.cos(angle_i - angle_j)
+                # Clustering term (existing, rotation-invariant)
                 for α in range(self.n_aa):
                     for β in range(self.n_aa):
                         h_i = max(0, self.normalized_hydrophobic[α])
                         h_j = max(0, self.normalized_hydrophobic[β])
-                        coupling = -weight * h_i * h_j * alignment / (self.L * 2.0)
-                        if abs(coupling) > 1e-6:
-                            self._add_pairwise_coupling_term(i, j, α, β, coupling)
+                        coupling_cluster = -weight * h_i * h_j * alignment / (self.L * 2.0)
+                        if abs(coupling_cluster) > 1e-6:
+                            self._add_pairwise_coupling_term(i, j, α, β, coupling_cluster)
+                # Orientation term: biases cluster toward membrane direction (phase)
+                # cos(angle_i + angle_j - 2*phase) encourages average angle ~ phase
+                alignment_ori = np.cos(angle_i + angle_j - 2 * phase_rad)
+                for α in range(self.n_aa):
+                    for β in range(self.n_aa):
+                        h_i = max(0, self.normalized_hydrophobic[α])
+                        h_j = max(0, self.normalized_hydrophobic[β])
+                        coupling_ori = -weight * h_i * h_j * alignment_ori / (self.L * 2.0)  # /2 from expansion, but tune if needed
+                        if abs(coupling_ori) > 1e-6:
+                            self._add_pairwise_coupling_term(i, j, α, β, coupling_ori)
         self._normalize_pauli_terms()
 
     def _add_amphipathic_segregation_terms(self, weight: float):
