@@ -393,20 +393,29 @@ class ClassicalSolver:
         print("\n🏆 Solving with Classical Brute-Force...")
         best_bitstring = None
         best_energy = float('inf')
+        top_sequences = []  # Store top sequences for debugging
         
         possible_codes = list(range(self.n_aa))
-        all_combinations = itertools.product(possible_codes, repeat=self.L)
+        all_combinations = list(itertools.product(possible_codes, repeat=self.L))
         
         for sequence_code in all_combinations:
             bitstring = ''.join(format(c, f'0{self.bits_per_pos}b') for c in sequence_code)
             current_energy = self.compute_energy_from_bitstring(bitstring)
+            sequence = self.decode_solution(bitstring)
+            top_sequences.append((sequence, bitstring, current_energy))
             if current_energy < best_energy:
                 best_energy = current_energy
                 best_bitstring = bitstring
         
         best_sequence = self.decode_solution(best_bitstring)
         
-        print(f"✅ Classical brute-force completed!")
+        # Debug: Print top 5 sequences and their energies
+        top_sequences.sort(key=lambda x: x[2])  # Sort by energy
+        print("\nTop 5 sequences by energy:")
+        for seq, bits, energy in top_sequences[:5]:
+            print(f"Sequence: {seq}, Energy: {energy:.6f}, Bitstring: {bits}")
+        
+        print(f"\n✅ Classical brute-force completed!")
         print(f"➡️ Best sequence: {best_sequence} | Energy: {best_energy:.6f}")
 
         return {

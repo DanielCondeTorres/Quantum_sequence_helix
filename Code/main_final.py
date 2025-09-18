@@ -1,4 +1,3 @@
-
 import numpy as np
 from pennylane import numpy as qnp
 import pennylane as qml
@@ -336,23 +335,25 @@ class QuantumProteinDesign:
     def analyze_solution(self, result: Dict[str, Any]):
         print("\n🧬 QUANTUM SOLUTION ANALYSIS 🧬")
         bitstring = result['bitstring']
-        repaired_sequence = result['repaired_sequence']
-        repaired_energy = result['repaired_cost']
+        # Use 'repaired_sequence' for quantum solvers, fall back to 'sequence' for classical
+        sequence = result.get('repaired_sequence', result.get('sequence', ''))
+        # Use 'repaired_cost' for quantum solvers, fall back to 'energy' for classical
+        energy = result.get('repaired_cost', result.get('energy', float('inf')))
         
         print(f"Binary solution: {bitstring}")
-        print(f"Decoded sequence: {repaired_sequence}")
-        print(f"Final energy: {repaired_energy:.6f}")
+        print(f"Decoded sequence: {sequence}")
+        print(f"Final energy: {energy:.6f}")
         
-        violation_count = repaired_sequence.count('X')
+        violation_count = sequence.count('X')
         print(f"Constraint violations: {violation_count}/{self.L}")
         
         if violation_count == 0:
-            hydrophobic_residues = sum(1 for aa in repaired_sequence if aa in ['A', 'L', 'I', 'M', 'F', 'W', 'V'])
-            charged_residues = sum(1 for aa in repaired_sequence if aa in ['E', 'K', 'R', 'D'])
+            hydrophobic_residues = sum(1 for aa in sequence if aa in ['A', 'L', 'I', 'M', 'F', 'W', 'V'])
+            charged_residues = sum(1 for aa in sequence if aa in ['E', 'K', 'R', 'D'])
             print(f"Hydrophobic residues: {hydrophobic_residues}/{self.L}")
             print(f"Charged residues: {charged_residues}/{self.L}")
         
-        return repaired_sequence, violation_count
+        return sequence, violation_count
 
     def plot_optimization(self, costs: List[float]):
         plt.figure(figsize=(10, 6))
@@ -401,7 +402,7 @@ class QuantumProteinDesign:
         try:
             if self.kwargs.get('membrane_mode', 'span') == 'wheel':
                 phase = np.deg2rad(self.kwargs.get('wheel_phase_deg', 0.0))
-                halfw = np.deg2rad(self.kwargs.get('wheel_halfwidth_deg', 80.0))  # ¡Cambiado a 80.0 para consistencia!
+                halfw = np.deg2rad(self.kwargs.get('wheel_halfwidth_deg', 80.0))
                 for sign in [+1, -1]:
                     ang = sign * halfw
                     x = radius * np.cos(ang)
@@ -489,7 +490,7 @@ if __name__ == '__main__':
     parser.add_argument('--membrane_mode', type=str, default='span', choices=['span', 'set', 'wheel'], help='Mode for defining membrane positions.')
     parser.add_argument('--wheel_phase_deg', type=float, default=0.0, help='Phase angle for helical wheel in degrees.')
     parser.add_argument('--wheel_halfwidth_deg', type=float, default=80.0, help='Half-width of the membrane sector in degrees for helical wheel.')
-    parser.add_argument('--lambda_env', type=float, default=4.0, help='Weight of the environment preference term.')
+    parser.add_argument('--lambda_env', type=float, default=80.0, help='Weight of the environment preference term.')
     parser.add_argument('--lambda_charge', type=float, default=0.5, help='Weight of the membrane charge term.')
     parser.add_argument('--lambda_mu', type=float, default=0.5, help='Weight of the hydrophobic moment term.')
     parser.add_argument('--lambda_local', type=float, default=0.5, help='Weight of the local preference terms.')
