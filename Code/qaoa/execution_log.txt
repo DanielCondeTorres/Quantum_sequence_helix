@@ -1,0 +1,3 @@
+Solver: qaoa | Execution Time: 542.2057 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: VVVVVV
+Solver: qaoa | Execution Time: 767.9824 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: VVAVVV
+Solver: qaoa | Execution Time: 286.8637 seconds | Phase: 0.0° | Halfwidth: 90.0° | Sequence: VVAVVV

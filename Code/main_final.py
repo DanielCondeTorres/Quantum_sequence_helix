@@ -1,3 +1,4 @@
+
 import numpy as np
 from pennylane import numpy as qnp
 import pennylane as qml
@@ -9,6 +10,7 @@ import itertools
 import argparse
 import sys
 import time
+import os
 from core.hamiltonian_builder import HamiltonianBuilder
 from core.solvers import QAOASolver, ClassicalSolver
 # Clasico y helice a mas vecinos
@@ -42,6 +44,10 @@ class QuantumProteinDesign:
         self.shots = shots  # Default to 1000 shots
         self.kwargs = kwargs
         
+        # Ensure output_dir exists
+        output_dir = kwargs.get('output_dir', 'output')
+        os.makedirs(output_dir, exist_ok=True)
+        
         print("🧬 QUANTUM PROTEIN DESIGN SETUP 🧬")
         print(f"Sequence length: {self.L}")
         print(f"Amino acids: {self.amino_acids}")
@@ -49,6 +55,7 @@ class QuantumProteinDesign:
         print(f"Required qubits: {self.n_qubits}")
         print(f"Quantum backend: {self.backend}")
         print(f"Number of shots: {self.shots}")
+        print(f"Output directory: {output_dir}")
         print("="*50)
 
         from core.hamiltonian_builder import HamiltonianBuilder
@@ -112,9 +119,11 @@ class QuantumProteinDesign:
         plt.title(f'Top Probability Distribution of Amino Acid Sequences from {solver_name}')
         plt.xticks(range(len(sequences)), sequences, rotation=90)
         plt.tight_layout()
-        plt.savefig(f'{solver_name.lower()}_probability_plot.png',dpi=300)  # Save to file
+        # Save to output_dir
+        output_path = os.path.join(self.kwargs.get('output_dir', 'output'), f'{solver_name.lower()}_probability_plot.png')
+        plt.savefig(output_path, dpi=300)  # Save to file
         plt.close()  # Close the figure to avoid memory issues
-        print(f"Plot saved as {solver_name.lower()}_probability_plot.png")
+        print(f"Plot saved as {output_path}")
 
     def solve_qaoa_pennylane(self, p_layers: int = 2, max_iterations: int = 200, n_starts: int = 4, init_strategy: str = 'linear', warm_start: bool = True) -> Dict[str, Any]:
         """Solve using QAOA with PennyLane"""
@@ -352,8 +361,11 @@ class QuantumProteinDesign:
         plt.ylabel('Energy')
         plt.title('Quantum Optimization Convergence')
         plt.grid(True, alpha=0.3)
-        plt.savefig('optimization_convergence.png',dpi=300)  # Save to file
+        # Save to output_dir
+        output_path = os.path.join(self.kwargs.get('output_dir', 'output'), 'optimization_convergence.png')
+        plt.savefig(output_path, dpi=300)  # Save to file
         plt.close()
+        print(f"Plot saved as {output_path}")
 
     def plot_alpha_helix_wheel(self, sequence: str):
         polar = set(['S','T','N','Q','Y','C','G'])
@@ -414,8 +426,11 @@ class QuantumProteinDesign:
         ax.set_ylim(-1.3, 1.3)
         ax.axis('off')
         plt.title('Alpha-Helix Wheel')
-        plt.savefig('alpha_helix_wheel.png',dpi=300)  # Save to file
+        # Save to output_dir
+        output_path = os.path.join(self.kwargs.get('output_dir', 'output'), 'alpha_helix_wheel.png')
+        plt.savefig(output_path, dpi=300)  # Save to file
         plt.close()
+        print(f"Plot saved as {output_path}")
 
 def run_quantum_protein_design(sequence_length, amino_acids, quantum_backend='pennylane', 
                                shots: int = 1000, **kwargs):
@@ -472,8 +487,8 @@ if __name__ == '__main__':
     parser.add_argument('--membrane', type=str, help='Membrane span (e.g., 1:4)')
     parser.add_argument('--membrane_positions', type=str, help='Membrane positions (e.g., 0,2,5)')
     parser.add_argument('--membrane_mode', type=str, default='span', choices=['span', 'set', 'wheel'], help='Mode for defining membrane positions.')
-    parser.add_argument('--wheel_phase_deg', type=float, default=0.0, help='Phase angle for helical wheel in degrees.')  # ¡Cambiado default a 0.0!
-    parser.add_argument('--wheel_halfwidth_deg', type=float, default=80.0, help='Half-width of the membrane sector in degrees for helical wheel.')  # ¡Cambiado a 80.0 para sensibilidad!
+    parser.add_argument('--wheel_phase_deg', type=float, default=0.0, help='Phase angle for helical wheel in degrees.')
+    parser.add_argument('--wheel_halfwidth_deg', type=float, default=80.0, help='Half-width of the membrane sector in degrees for helical wheel.')
     parser.add_argument('--lambda_env', type=float, default=4.0, help='Weight of the environment preference term.')
     parser.add_argument('--lambda_charge', type=float, default=0.5, help='Weight of the membrane charge term.')
     parser.add_argument('--lambda_mu', type=float, default=0.5, help='Weight of the hydrophobic moment term.')
@@ -483,7 +498,11 @@ if __name__ == '__main__':
     parser.add_argument('--max_interaction_dist', type=int, default=4, help='Maximum sequence distance for pairwise interactions.')
     parser.add_argument('--membrane_charge', type=str, default='neu', choices=['neu', 'neg', 'pos'], help='Charge of the membrane.')
     parser.add_argument('--lambda_electrostatic', type=float, default=0.5, help='Weight of the electrostatics term.')
+    parser.add_argument('--output_dir', type=str, default='output', help='Directory to save output files (plots and logs).')
     args = parser.parse_args()
+    
+    # Create the output directory if it doesn't exist
+    os.makedirs(args.output_dir, exist_ok=True)
     
     aa_list = ["A", "R", "N", "D", "C", "E", "Q", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V"]
     if args.residues:
@@ -532,6 +551,7 @@ if __name__ == '__main__':
         wheel_phase_deg=args.wheel_phase_deg,
         wheel_halfwidth_deg=args.wheel_halfwidth_deg,
         solver=args.solver,
+        output_dir=args.output_dir
     )
     end_time = time.time() # End timer
     execution_time = end_time - start_time # Calculate duration 
@@ -551,11 +571,21 @@ if __name__ == '__main__':
         print(f"Secuencia Reparada: {qaoa_result['repaired_sequence']}")
         print(f"Energía Final: {qaoa_result['repaired_cost']:.6f}")
 
+    # Plot alpha helix wheel with the most probable sequence
     if args.membrane_mode == 'wheel' and qaoa_result:
-        sequence = qaoa_result.get('repaired_sequence', qaoa_result.get('sequence'))
+        if args.solver == 'classical':
+            sequence = qaoa_result.get('sequence')
+        else:
+            # Use the most probable sequence from the quantum solver
+            best_bitstring = qaoa_result.get('bitstring')
+            sequence = designer.decode_solution(best_bitstring)
+            print(f"Most probable sequence for helix wheel: {sequence}")
         designer.plot_alpha_helix_wheel(sequence)
+    
     # Log the execution time and solver to a file
     log_entry = f"Solver: {args.solver} | Execution Time: {execution_time:.4f} seconds | Phase: {args.wheel_phase_deg}° | Halfwidth: {args.wheel_halfwidth_deg}° | Sequence: {qaoa_result.get('repaired_sequence', qaoa_result.get('sequence', ''))}\n"
-    with open("execution_log.txt", "a") as log_file:
+    log_path = os.path.join(args.output_dir, "execution_log.txt")
+    with open(log_path, "a") as log_file:
         log_file.write(log_entry)
-    print(f"\nExecution time logged to execution_log.txt")
+    print(f"\nExecution time logged to {log_path}")
+    #  python main_final.py -L 6 -R V,A,N,S --membrane_mode wheel --wheel_phase_deg 0 --wheel_halfwidth_deg 90  --output_dir qaoa
