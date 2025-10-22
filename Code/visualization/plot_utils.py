@@ -53,13 +53,13 @@ def plot_alpha_helix_wheel(sequence: str, membrane_mode: str = 'span', wheel_pha
     for i, aa in enumerate(sequence):
         plt.scatter(xs[i], ys[i], s=600, color=color_map[aa], edgecolors='k', zorder=3)
         # Amino acid letter
-        plt.text(xs[i], ys[i], aa, ha='center', va='center', fontsize=12, weight='bold', color='white', zorder=4)
+        plt.text(xs[i], ys[i], aa, ha='center', va='center', fontsize=16, weight='bold', color='white', zorder=4)
         # Residue index (1-based), slightly offset radially outward
         r_idx = radius + 0.12
         ang_i = angles[i]
         xi = r_idx * np.cos(ang_i)
         yi = r_idx * np.sin(ang_i)
-        plt.text(xi, yi, f"{i+1}", ha='center', va='center', fontsize=9, color='black', zorder=5)
+        plt.text(xi, yi, f"{i+1}", ha='center', va='center', fontsize=12, color='black', zorder=5)
 
     # Connect residues in sequence order to show the helical path
     for i in range(len(sequence) - 1):
@@ -91,11 +91,11 @@ def plot_alpha_helix_wheel(sequence: str, membrane_mode: str = 'span', wheel_pha
         mid_ang = phase
         xm = 1.15 * radius * np.cos(mid_ang)
         ym = 1.15 * radius * np.sin(mid_ang)
-        ax.text(xm, ym, 'Membrane (lipids)', ha='center', va='center', fontsize=10, color='#8B4513', weight='bold')
+        ax.text(xm, ym, 'Membrane (lipids)', ha='center', va='center', fontsize=12, color='#8B4513', weight='bold')
         # Water side (opposite)
         xa = 1.15 * radius * np.cos(mid_ang + np.pi)
         ya = 1.15 * radius * np.sin(mid_ang + np.pi)
-        ax.text(xa, ya, 'Water', ha='center', va='center', fontsize=10, color='teal', weight='bold')
+        ax.text(xa, ya, 'Water', ha='center', va='center', fontsize=12, color='teal', weight='bold')
 
     ax.set_aspect('equal')
     ax.set_xlim(-1.3, 1.3)
