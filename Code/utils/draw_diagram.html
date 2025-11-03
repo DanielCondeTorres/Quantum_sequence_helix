@@ -1,0 +1,290 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagrama QAOA</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f7f9fc;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            position: relative;
+            width: 1100px;
+            height: 700px;
+            background-color: white;
+            border: 2px solid #333;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            overflow: visible;
+        }
+
+        /* --- Global styles for blocks --- */
+        .block {
+            position: absolute;
+            border: 2px solid black;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 5px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        /* --- Variational Parameters Box (Blue) --- */
+        .params-box {
+            top: 40px;
+            left: 150px;
+            width: 600px;
+            height: 70px;
+            background-color: #6495ED;
+            color: white;
+            flex-direction: column;
+            line-height: 1.1;
+            padding: 10px;
+            font-weight: bold;
+        }
+        .params-box .formula { 
+            font-size: 16px; 
+            margin-top: 5px;
+        }
+
+        /* --- Quantum Circuit Blocks (Green Outer) --- */
+        .circuit-block-outer {
+            top: 230px;
+            width: 180px;
+            height: 320px;
+            background-color: #d4edda;
+            flex-direction: column;
+            justify-content: space-around;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .circuit-block-1 { left: 100px; }
+        .circuit-block-2 { left: 550px; }
+
+        .circuit-block-inner {
+            width: 70px;
+            height: 140px;
+            background-color: #ADD8E6;
+            border: 2px solid black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            padding: 5px;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            line-height: 1.2;
+        }
+
+        /* --- Measurement Blocks (Orange) --- */
+        .measure-block {
+            top: 280px;
+            left: 850px;
+            width: 50px;
+            height: 160px;
+            background-color: #ffeadb;
+            justify-content: space-around;
+            flex-direction: column;
+            padding: 5px;
+        }
+        .measure-gate {
+            width: 30px;
+            height: 30px;
+            background-color: #FFA500;
+            border: 2px solid black;
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            font-weight: bold;
+        }
+        .measure-gate::before {
+            content: '⟂';
+            transform: rotate(90deg);
+        }
+
+        /* --- Optimization Box (Pink) --- */
+        .optimization-box {
+            top: 80px;
+            left: 950px;
+            width: 80px;
+            height: 500px;
+            background-color: #F8BBD0;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            justify-content: space-around;
+            flex-direction: column;
+            padding: 10px;
+            font-size: 12px;
+            line-height: 1.1;
+        }
+        .optimization-box span { 
+            font-weight: bold;
+            writing-mode: horizontal-tb;
+            text-orientation: sideways;
+            margin: 2px 0;
+        }
+
+        /* --- Lines and dots --- */
+        .line {
+            position: absolute;
+            background-color: black;
+            height: 2px;
+        }
+        .line.horizontal { 
+            width: 650px; 
+            left: 200px;
+        }
+        .line.q1 { top: 310px; }
+        .line.q2 { top: 360px; }
+        .line.q3 { top: 410px; }
+        .dots {
+            position: absolute;
+            top: 385px;
+            left: 420px;
+            font-size: 24px;
+            color: #333;
+            font-weight: bold;
+        }
+        .dashed-line {
+            position: absolute;
+            top: 385px;
+            left: 340px;
+            width: 140px;
+            border-top: 2px dashed black;
+            transform: rotate(-5deg); /* Slight angle for visual appeal */
+        }
+
+        /* --- Arrows --- */
+        .arrow {
+            position: absolute;
+            background-color: black;
+            z-index: 10;
+        }
+        .arrow::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+        }
+        .arrow.down {
+            width: 2px;
+            height: 140px;
+            top: 110px;
+            left: 280px;
+        }
+        .arrow.down::after {
+            border-width: 8px 8px 0 8px;
+            border-color: black transparent transparent transparent;
+            bottom: 0;
+            left: -7px;
+        }
+        .arrow.down.right { 
+            left: 730px; 
+        }
+
+        .arrow.right {
+            width: 100px;
+            height: 2px;
+            left: 780px;
+            top: 360px;
+        }
+        .arrow.right::after {
+            border-width: 8px 0 8px 8px;
+            border-color: transparent transparent transparent black;
+            right: 0;
+            top: -7px;
+        }
+        .arrow.feedback-loop {
+            width: 2px;
+            height: 380px;
+            right: 40px;
+            top: 180px;
+            transform: rotate(10deg);
+        }
+        .arrow.feedback-loop::before {
+            content: '';
+            position: absolute;
+            width: 250px;
+            height: 2px;
+            background-color: black;
+            top: -20px;
+            left: -250px;
+            border-radius: 0 0 50% 50%; /* Curved effect approximation */
+        }
+        .arrow.feedback-loop::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 8px 8px 8px 0;
+            border-color: transparent black transparent transparent;
+            top: -27px;
+            left: -250px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="block params-box">
+            <span>Variational parameters</span>
+            <span class="formula">\( (\hat{\gamma}, \hat{\beta}) = (\gamma_1, \dots, \gamma_p, \beta_1, \dots, \beta_p) \)</span>
+        </div>
+
+        <div class="block circuit-block-outer circuit-block-1">
+            <div class="circuit-block-inner">\( e^{-i \gamma_1 H_C} \)</div>
+            <div class="circuit-block-inner">\( e^{-i \beta_1 H_B} \)</div>
+        </div>
+        
+        <div class="block circuit-block-outer circuit-block-2">
+            <div class="circuit-block-inner">\( e^{-i \gamma_p H_C} \)</div>
+            <div class="circuit-block-inner">\( e^{-i \beta_p H_B} \)</div>
+        </div>
+
+        <div class="block measure-block">
+            <div class="measure-gate"></div>
+            <div class="measure-gate"></div>
+            <div class="measure-gate"></div>
+        </div>
+
+        <div class="block optimization-box">
+            <span>Optimization</span>
+            <span>\( \max \langle H_C \rangle \)</span>
+            <span>\( (\vec{\gamma}, \vec{\beta}) \)</span>
+        </div>
+
+        <div class="line horizontal q1"></div>
+        <div class="line horizontal q2"></div>
+        <div class="line horizontal q3"></div>
+        <div class="dots">...</div>
+        <div class="dashed-line"></div>
+        
+        <div class="arrow down"></div>
+        <div class="arrow down right"></div>
+        <div class="arrow right"></div>
+        <div class="arrow feedback-loop"></div>
+    </div>
+
+</body>
+</html>
+```
