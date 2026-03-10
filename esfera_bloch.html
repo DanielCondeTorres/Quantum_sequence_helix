@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>QAOA – Bloch Sphere + Phase & Probability</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;500;700&family=Outfit:wght@300;500;700;800&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f7fc;--white:#ffffff;--border:rgba(60,100,180,0.13);--border2:rgba(60,100,180,0.2);
+  --blue:#1a5fd4;--gold:#c07800;--rose:#cc1a44;--green:#007a48;--dim:#6878a8;
+  --text:#18223a;--sub:#4a5580;--mono:'JetBrains Mono',monospace;--ui:'Outfit',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--ui);
+  overflow:hidden;width:100vw;height:100vh;display:flex;flex-direction:column}
+header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:10px 22px;border-bottom:1.5px solid var(--border2);
+  background:var(--white);box-shadow:0 1px 8px rgba(60,100,200,0.06)}
+.h-title{font-size:.88rem;font-weight:800;letter-spacing:.05em;color:var(--blue);text-transform:uppercase}
+.h-sub{font-size:.57rem;font-family:var(--mono);color:var(--dim);margin-top:1px}
+.badges{display:flex;gap:6px}
+.badge{font-family:var(--mono);font-size:.55rem;padding:3px 8px;border-radius:4px;font-weight:600;letter-spacing:.08em}
+.b-blue{background:rgba(26,95,212,.08);border:1px solid rgba(26,95,212,.2);color:var(--blue)}
+.b-green{background:rgba(0,122,72,.08);border:1px solid rgba(0,122,72,.2);color:var(--green)}
+
+.main{flex:1 1 auto;display:flex;overflow:hidden}
+#bloch-wrap{flex:1 1 auto;position:relative;min-width:0}
+#bloch-wrap canvas{display:block;width:100%!important;height:100%!important}
+
+/* RIGHT PANEL */
+.side{flex:0 0 310px;display:flex;flex-direction:column;
+  border-left:1.5px solid var(--border2);background:var(--white);overflow:hidden}
+
+/* CHART AREA - two separate charts stacked */
+.charts-wrap{flex:0 0 auto;padding:12px 14px 4px;border-bottom:1px solid var(--border)}
+.chart-row-title{font-size:.6rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.ctag{display:inline-block;font-size:.52rem;padding:1px 7px;border-radius:3px;font-weight:700;letter-spacing:.1em}
+.ctag-phase{background:rgba(192,120,0,.12);border:1px solid rgba(192,120,0,.3);color:var(--gold)}
+.ctag-prob{background:rgba(26,95,212,.1);border:1px solid rgba(26,95,212,.28);color:var(--blue)}
+.chart-note{font-size:.52rem;font-family:var(--mono);color:var(--dim);margin-bottom:4px}
+canvas.ch{display:block;width:100%;border-radius:5px;background:var(--bg);
+  border:1px solid var(--border);margin-bottom:10px}
+
+/* SIDE INFO */
+.info-panel{flex:1 1 auto;overflow-y:auto;padding:10px 13px;display:flex;flex-direction:column;gap:8px}
+.card{background:var(--bg);border:1px solid var(--border2);border-radius:7px;padding:9px 12px}
+.card-title{font-size:.52rem;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:7px;font-weight:700}
+#phase-badge{text-align:center;padding:8px;border-radius:5px;font-size:.7rem;font-weight:700;
+  letter-spacing:.04em;border:1px solid var(--border);transition:all .4s;background:var(--white)}
+#step-info{text-align:center;font-size:.57rem;color:var(--dim);margin-top:4px;font-family:var(--mono)}
+
+/* what's changing box */
+#changing-box{display:flex;gap:8px;margin-top:6px}
+.change-item{flex:1;padding:6px 7px;border-radius:5px;border:1px solid var(--border);
+  text-align:center;transition:all .4s;background:var(--white)}
+.change-item .ci-icon{font-size:1rem;display:block;margin-bottom:2px}
+.change-item .ci-label{font-size:.55rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.change-item .ci-val{font-size:.6rem;font-family:var(--mono);color:var(--dim);margin-top:1px}
+.ci-active-phase{background:rgba(192,120,0,.1)!important;border-color:rgba(192,120,0,.35)!important}
+.ci-active-phase .ci-label{color:var(--gold)!important}
+.ci-active-prob{background:rgba(26,95,212,.09)!important;border-color:rgba(26,95,212,.32)!important}
+.ci-active-prob .ci-label{color:var(--blue)!important}
+.ci-frozen{opacity:.38}
+
+/* candidates */
+.cand-row{display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:5px;
+  border:1px solid transparent;transition:all .3s;margin:2px 0}
+.cand-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cand-label{font-size:.58rem;font-weight:700;flex:0 0 52px}
+.cand-bar-wrap{flex:1;height:8px;border-radius:4px;background:rgba(60,100,180,.09);overflow:hidden}
+.cand-bar{height:100%;border-radius:4px;transition:width .1s linear}
+.cand-p{font-size:.58rem;width:36px;text-align:right;font-family:var(--mono)}
+.cand-winner{background:rgba(0,122,72,.07);border-color:rgba(0,122,72,.25)!important}
+.cand-winner .cand-label,.cand-winner .cand-p{color:var(--green)!important;font-weight:700}
+.cand-loser{opacity:.38}
+
+.btn{width:100%;padding:7px;border-radius:5px;border:1px solid var(--border2);
+  background:rgba(26,95,212,.07);color:var(--blue);font-family:var(--mono);
+  font-size:.61rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+  transition:all .15s;margin-top:4px;font-weight:600}
+.btn:hover{background:rgba(26,95,212,.15);border-color:var(--blue)}
+.btn-r{background:rgba(200,40,60,.06);color:var(--rose);border-color:rgba(200,40,60,.2)}
+.btn-r:hover{background:rgba(200,40,60,.14);border-color:var(--rose)}
+
+/* overlay */
+#overlay{position:absolute;top:13%;left:50%;transform:translateX(-50%);
+  pointer-events:none;text-align:center;transition:opacity .55s;opacity:0;white-space:nowrap;z-index:10}
+#ol-big{font-family:var(--ui);font-size:1.4rem;font-weight:800;letter-spacing:.05em}
+#ol-sm{font-family:var(--mono);font-size:.57rem;color:var(--dim);margin-top:3px;letter-spacing:.1em}
+
+footer{flex:0 0 auto;padding:4px 18px;border-top:1.5px solid var(--border2);background:var(--white);
+  font-family:var(--mono);font-size:.54rem;color:var(--dim);display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="h-title">QAOA · Optimal Solution Search · p = 2</div>
+    <div class="h-sub">U_C(γ) changes phase only · U_B(β) changes probability only · 8 candidates from |+⟩</div>
+  </div>
+  <div class="badges">
+    <span class="badge b-blue">MULTI-STATE · p=2</span>
+    <span class="badge b-green">PHASE ≠ PROBABILITY</span>
+  </div>
+</header>
+
+<div class="main">
+  <div id="bloch-wrap">
+    <canvas id="bc"></canvas>
+    <div id="overlay"><div id="ol-big"></div><div id="ol-sm"></div></div>
+  </div>
+
+  <div class="side">
+    <!-- Two separate charts -->
+    <div class="charts-wrap">
+      <!-- Phase chart -->
+      <div class="chart-row-title">
+        <span class="ctag ctag-phase">PHASE</span>
+        <span style="font-size:.58rem;color:var(--sub);font-weight:500">Relative phase of optimal |ψ⟩</span>
+      </div>
+      <div class="chart-note">Changes only during U_C(γ) — flat during U_B(β)</div>
+      <canvas class="ch" id="chart-phase" height="90"></canvas>
+
+      <!-- Probability chart -->
+      <div class="chart-row-title">
+        <span class="ctag ctag-prob">PROBABILITY</span>
+        <span style="font-size:.58rem;color:var(--sub);font-weight:500">P(|0⟩) per candidate</span>
+      </div>
+      <div class="chart-note">Changes only during U_B(β) — flat during U_C(γ)</div>
+      <canvas class="ch" id="chart-prob" height="90"></canvas>
+    </div>
+
+    <!-- Info panel -->
+    <div class="info-panel">
+      <div class="card">
+        <div class="card-title">Current Gate</div>
+        <div id="phase-badge">Initialising |+⟩</div>
+        <div id="step-info">All candidates at the equator</div>
+        <div id="changing-box">
+          <div class="change-item" id="ci-phase">
+            <span class="ci-icon">φ</span>
+            <div class="ci-label">Phase</div>
+            <div class="ci-val" id="ci-phase-val">—</div>
+          </div>
+          <div class="change-item" id="ci-prob">
+            <span class="ci-icon">P</span>
+            <div class="ci-label">Prob</div>
+            <div class="ci-val" id="ci-prob-val">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Candidates — P(|0⟩)</div>
+        <div id="cand-list"></div>
+      </div>
+
+      <div class="card">
+        <button class="btn" id="btn-play">⏸ Pause</button>
+        <button class="btn btn-r" id="btn-reset">↺ Restart</button>
+      </div>
+
+      <div class="card" style="font-size:.58rem;line-height:1.7;color:var(--sub)">
+        <div class="card-title">Key Physics</div>
+        <div><b style="color:var(--gold)">U_C(γ) = e<sup>−iγZ</sup></b> rotates around Z.<br>
+        Z-rotation <b>never</b> changes |α|² or |β|² — the probability stays flat. Only the relative phase φ = arg(α)−arg(β) shifts.</div>
+        <div style="margin-top:6px"><b style="color:var(--blue)">U_B(β) = e<sup>−iβX</sup></b> rotates around X.<br>
+        X-rotation mixes |0⟩ and |1⟩ components — probability changes. The phase accumulated by U_C is now converted into amplitude.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<footer>
+  <span>Initial state: |+⟩ · North pole = |0⟩ target · QAOA p=2</span>
+  <span>drag to rotate · scroll to zoom</span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── Math ──────────────────────────────────────────────────────────────────
+const cmul=(a,b)=>({r:a.r*b.r-a.i*b.i,i:a.r*b.i+a.i*b.r});
+const cadd=(a,b)=>({r:a.r+b.r,i:a.i+b.i});
+const mv=(M,v)=>[cadd(cmul(M[0][0],v[0]),cmul(M[0][1],v[1])),
+                 cadd(cmul(M[1][0],v[0]),cmul(M[1][1],v[1]))];
+const normV=v=>{const n=Math.sqrt(v[0].r**2+v[0].i**2+v[1].r**2+v[1].i**2)||1;
+  return[{r:v[0].r/n,i:v[0].i/n},{r:v[1].r/n,i:v[1].i/n}]};
+// U_C(g) = e^{-igZ}: diagonal, only adds phase to each component
+const Uc=g=>[[ {r:Math.cos(g),i:-Math.sin(g)},{r:0,i:0}],
+              [{r:0,i:0},          {r:Math.cos(g),i:Math.sin(g)}]];
+// U_B(b) = e^{-ibX}: mixes components, changes probabilities
+const Ub=b=>[[{r:Math.cos(b),i:0},{r:0,i:-Math.sin(b)}],
+              [{r:0,i:-Math.sin(b)},{r:Math.cos(b),i:0}]];
+const bloch=v=>{const a=v[0],b=v[1];
+  return[2*(a.r*b.r+a.i*b.i),2*(a.i*b.r-a.r*b.i),a.r**2+a.i**2-b.r**2-b.i**2]};
+const lerpS=(v0,v1,t)=>normV([
+  {r:v0[0].r*(1-t)+v1[0].r*t,i:v0[0].i*(1-t)+v1[0].i*t},
+  {r:v0[1].r*(1-t)+v1[1].r*t,i:v0[1].i*(1-t)+v1[1].i*t}]);
+const prob0=v=>v[0].r**2+v[0].i**2;
+// Relative phase: angle of alpha component (arg of alpha)
+// For U_C this is what changes; prob0 stays constant at 0.5 from |+>
+const relPhaseNorm=v=>{
+  let phi=Math.atan2(v[0].i,v[0].r);
+  // Normalise 0..1 for display
+  if(phi<0)phi+=2*Math.PI;
+  return phi/(2*Math.PI);
+};
+
+// ── Candidates ────────────────────────────────────────────────────────────
+const CANDS=[
+  {g1:Math.PI/4,  b1:Math.PI/4,  g2:Math.PI/3,  b2:Math.PI/4  },
+  {g1:Math.PI/6,  b1:Math.PI/8,  g2:Math.PI/6,  b2:Math.PI/8  },
+  {g1:Math.PI/3,  b1:Math.PI/6,  g2:Math.PI/4,  b2:Math.PI/6  },
+  {g1:Math.PI/8,  b1:Math.PI/3,  g2:Math.PI/8,  b2:Math.PI/3  },
+  {g1:Math.PI/2,  b1:Math.PI/8,  g2:Math.PI/2,  b2:Math.PI/9  },
+  {g1:Math.PI/12, b1:Math.PI/12, g2:Math.PI/10, b2:Math.PI/10 },
+  {g1:Math.PI*.55,b1:Math.PI*.4, g2:Math.PI*.6, b2:Math.PI*.45},
+  {g1:Math.PI/5,  b1:Math.PI*.4, g2:Math.PI/5,  b2:Math.PI*.35},
+];
+const NC=CANDS.length;
+const INV2=1/Math.sqrt(2);
+const PSI0=[{r:INV2,i:0},{r:INV2,i:0}];
+
+CANDS.forEach(c=>{
+  c.s0=PSI0;
+  c.s1=normV(mv(Uc(c.g1),c.s0)); // after Uc1 — phase changed, prob same
+  c.s2=normV(mv(Ub(c.b1),c.s1)); // after Ub1 — prob changed
+  c.s3=normV(mv(Uc(c.g2),c.s2)); // after Uc2 — phase changed again, prob same
+  c.s4=normV(mv(Ub(c.b2),c.s3)); // after Ub2 — prob changed
+  c.p0final=prob0(c.s4);
+});
+const ranked=[...CANDS].sort((a,b)=>b.p0final-a.p0final);
+ranked[0].isWinner=true; ranked[NC-1].isLoser=true;
+
+const PAL_HEX=['#007a48','#1a5fd4','#c07800','#6030a8','#c04000','#006688','#880040','#3a7000'];
+const PAL_INT=[0x007a48,0x1a5fd4,0xc07800,0x6030a8,0xc04000,0x006688,0x880040,0x3a7000];
+CANDS.forEach((c,i)=>{
+  if(c.isWinner){c.ch='#007a48';c.ci=0x007a48;}
+  else if(c.isLoser){c.ch='#cc1a44';c.ci=0xcc1a44;}
+  else{c.ch=PAL_HEX[i];c.ci=PAL_INT[i];}
+});
+
+function getPsi(c,ph,t){
+  if(ph==='init')   return c.s0;
+  if(ph==='uc1')    return lerpS(c.s0,c.s1,t);
+  if(ph==='p1')     return c.s1;
+  if(ph==='ub1')    return lerpS(c.s1,c.s2,t);
+  if(ph==='p2')     return c.s2;
+  if(ph==='uc2')    return lerpS(c.s2,c.s3,t);
+  if(ph==='p3')     return c.s3;
+  if(ph==='ub2')    return lerpS(c.s3,c.s4,t);
+  return c.s4;
+}
+
+// ── Sequence ──────────────────────────────────────────────────────────────
+const F={INIT:65,TR:110,PAUSE:50,FINAL:180};
+function buildSeq(){
+  const s=[];
+  const add=(ph,n,tFn)=>{for(let i=0;i<n;i++)s.push({ph,t:tFn(i,n)})};
+  add('init',F.INIT,()=>0);
+  add('uc1', F.TR,  (i,n)=>i/(n-1));
+  add('p1',  F.PAUSE,()=>1);
+  add('ub1', F.TR,  (i,n)=>i/(n-1));
+  add('p2',  F.PAUSE,()=>1);
+  add('uc2', F.TR,  (i,n)=>i/(n-1));
+  add('p3',  F.PAUSE,()=>1);
+  add('ub2', F.TR,  (i,n)=>i/(n-1));
+  add('final',F.FINAL,()=>1);
+  return s;
+}
+const SEQ=buildSeq();
+let seqIdx=0,playing=true;
+
+// ── Chart data ────────────────────────────────────────────────────────────
+// 5 x-axis ticks: H·start, after Uc1, after Ub1, after Uc2, after Ub2
+// Phase: only moves during Uc gates. Prob: only moves during Ub gates.
+const XLABELS=['|+⟩ Start','After U_C(γ₁)','After U_B(β₁)','After U_C(γ₂)','After U_B(β₂)'];
+// For phase chart: winner's relPhaseNorm at each tick
+// Important: prob0(winner.s0) = prob0(winner.s1) = prob0(winner.s3) = 0.5 exactly (Z-rotation)
+// For prob chart: winner & loser p0 at each tick
+const phaseSnaps=[
+  relPhaseNorm(PSI0),       // start
+  null, null, null, null    // filled during animation
+];
+const probSnapsW=[prob0(PSI0),null,null,null,null];
+const probSnapsL=[prob0(PSI0),null,null,null,null];
+
+// Precompute snaps for frozen lines
+phaseSnaps[1]=relPhaseNorm(CANDS.find(c=>c.isWinner).s1);
+phaseSnaps[2]=relPhaseNorm(CANDS.find(c=>c.isWinner).s2); // same as s1 (Ub doesn't change phase)
+phaseSnaps[3]=relPhaseNorm(CANDS.find(c=>c.isWinner).s3);
+phaseSnaps[4]=relPhaseNorm(CANDS.find(c=>c.isWinner).s4); // same as s3
+
+const winner=CANDS.find(c=>c.isWinner);
+const loser =CANDS.find(c=>c.isLoser);
+probSnapsW[1]=prob0(winner.s1); // = 0.5 (same as start)
+probSnapsW[2]=prob0(winner.s2);
+probSnapsW[3]=prob0(winner.s3); // same as s2
+probSnapsW[4]=prob0(winner.s4);
+probSnapsL[1]=prob0(loser.s1);
+probSnapsL[2]=prob0(loser.s2);
+probSnapsL[3]=prob0(loser.s3);
+probSnapsL[4]=prob0(loser.s4);
+
+// Live cursor values (updated each tick)
+let liveTick=0;        // 0..4 which x-region we're in
+let livePhase=relPhaseNorm(PSI0);
+let liveP0W=0.5;
+let liveP0L=0.5;
+let liveGateType='none'; // 'phase','mixer','none'
+
+// ── Chart drawing ─────────────────────────────────────────────────────────
+function drawChartBase(canvasEl,H_px,title,color,yLabel,yMin,yMax,
+  snaps,           // fixed points array [5 values or null]
+  liveTickIdx,     // current x position (0..4 or fractional)
+  liveVal,         // current live value at cursor
+  isActive,        // bool: is this chart's quantity currently changing?
+  extraLines       // [{snaps:[], color, opacity}]  optional extra lines
+){
+  const W=canvasEl.offsetWidth||282;
+  const H=H_px;
+  canvasEl.width=W*devicePixelRatio;
+  canvasEl.height=H*devicePixelRatio;
+  canvasEl.style.width=W+'px';
+  canvasEl.style.height=H+'px';
+  const ctx=canvasEl.getContext('2d');
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+
+  const PAD={t:14,r:10,b:22,l:36};
+  const cW=W-PAD.l-PAD.r, cH=H-PAD.t-PAD.b;
+  const N=5;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#f5f7fc'; ctx.fillRect(0,0,W,H);
+
+  const toX=i=>PAD.l+i*(cW/(N-1));
+  const toY=v=>PAD.t+cH*(1-(v-yMin)/(yMax-yMin));
+
+  // Freeze / active tint
+  if(!isActive){
+    ctx.fillStyle='rgba(100,120,180,0.04)';
+    ctx.fillRect(PAD.l,PAD.t,cW,cH);
+  }
+
+  // Grid lines
+  ctx.strokeStyle='rgba(60,100,180,0.07)';ctx.lineWidth=1;
+  for(let g=0;g<=4;g++){
+    const y=toY(yMin+(yMax-yMin)*g/4);
+    ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(PAD.l+cW,y);ctx.stroke();
+  }
+
+  // Vertical dividers at gate boundaries
+  for(let i=0;i<N;i++){
+    ctx.strokeStyle='rgba(60,100,180,0.08)';ctx.lineWidth=.8;
+    ctx.beginPath();ctx.moveTo(toX(i),PAD.t);ctx.lineTo(toX(i),PAD.t+cH);ctx.stroke();
+  }
+
+  // Current region highlight
+  const hx0=toX(Math.floor(liveTickIdx));
+  const hx1=liveTickIdx<N-1?toX(Math.floor(liveTickIdx)+1):toX(N-1);
+  ctx.fillStyle=isActive?`${color}18`:'rgba(100,120,180,0.04)';
+  ctx.fillRect(hx0,PAD.t,hx1-hx0,cH);
+
+  // Axes
+  ctx.strokeStyle='rgba(60,100,180,0.25)';ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(PAD.l,PAD.t);ctx.lineTo(PAD.l,PAD.t+cH);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(PAD.l,PAD.t+cH);ctx.lineTo(PAD.l+cW,PAD.t+cH);ctx.stroke();
+
+  // Y labels
+  ctx.font=`500 8px 'JetBrains Mono'`;ctx.fillStyle=color;ctx.textAlign='right';
+  for(let g=0;g<=2;g++){
+    const v=yMin+(yMax-yMin)*g/2;
+    ctx.fillText(v.toFixed(1),PAD.l-4,toY(v)+3);
+  }
+
+  // Extra lines (e.g. loser probability)
+  if(extraLines){
+    extraLines.forEach(el=>{
+      ctx.strokeStyle=el.color;ctx.lineWidth=1.5;ctx.globalAlpha=el.opacity||.4;
+      ctx.setLineDash([4,4]);ctx.beginPath();
+      let started=false;
+      el.snaps.forEach((v,i)=>{
+        if(v===null)return;
+        const x=toX(i),y=toY(v);
+        started?ctx.lineTo(x,y):ctx.moveTo(x,y);started=true;
+      });
+      ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+    });
+  }
+
+  // Main line (drawn up to current position)
+  ctx.strokeStyle=color;ctx.lineWidth=2.2;ctx.globalAlpha=isActive?1:.45;
+  ctx.beginPath();
+  let started=false;
+  // Draw snaps up to liveTickIdx
+  for(let i=0;i<=Math.floor(liveTickIdx)&&i<N;i++){
+    if(snaps[i]===null)continue;
+    const x=toX(i),y=toY(snaps[i]);
+    started?ctx.lineTo(x,y):ctx.moveTo(x,y);started=true;
+  }
+  // Draw live interpolated point
+  if(liveTickIdx%1>0&&started){
+    const fx=toX(liveTickIdx);
+    const fy=toY(liveVal);
+    ctx.lineTo(fx,fy);
+  }
+  ctx.stroke();ctx.globalAlpha=1;
+
+  // Dots at fixed snaps
+  for(let i=0;i<=Math.floor(liveTickIdx)&&i<N;i++){
+    if(snaps[i]===null)continue;
+    ctx.fillStyle=color;ctx.globalAlpha=isActive?1:.45;
+    ctx.beginPath();ctx.arc(toX(i),toY(snaps[i]),3.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='white';ctx.globalAlpha=1;
+    ctx.beginPath();ctx.arc(toX(i),toY(snaps[i]),1.8,0,Math.PI*2);ctx.fill();
+  }
+  // Live dot
+  if(isActive&&liveTickIdx%1>0){
+    ctx.fillStyle=color;ctx.globalAlpha=.9;
+    ctx.beginPath();ctx.arc(toX(liveTickIdx),toY(liveVal),4,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  // "FROZEN" label when not active
+  if(!isActive&&liveGateType!=='none'){
+    ctx.font=`700 9px 'Outfit'`;ctx.fillStyle=color;ctx.globalAlpha=.4;ctx.textAlign='center';
+    ctx.fillText('FLAT (no change)',PAD.l+cW/2,PAD.t+cH/2+4);
+    ctx.globalAlpha=1;
+  }
+
+  // X labels (only at gate boundaries)
+  ctx.font=`500 7.5px 'JetBrains Mono'`;ctx.fillStyle='#6878a8';ctx.textAlign='center';ctx.globalAlpha=1;
+  XLABELS.forEach((lbl,i)=>{
+    ctx.fillText(lbl,toX(i),PAD.t+cH+14);
+  });
+
+  // Title tag
+  ctx.font=`700 9px 'Outfit'`;ctx.fillStyle=color;ctx.textAlign='left';ctx.globalAlpha=1;
+  ctx.fillText(yLabel,PAD.l,PAD.t-3);
+}
+
+function redrawCharts(){
+  // Phase is a fraction 0..1 (normalised phase angle)
+  // Prob is 0..1
+  // Phase chart: only active during uc1, uc2
+  const phaseActive=(liveGateType==='phase');
+  // Prob chart: only active during ub1, ub2
+  const probActive=(liveGateType==='mixer');
+
+  // Phase snaps to show: start, after uc1, (same after ub1), after uc2, (same after ub2)
+  // We show only the changing ticks as non-null
+  const phaseDisplay=[
+    phaseSnaps[0],
+    liveTick>=1?phaseSnaps[1]:null,
+    liveTick>=2?phaseSnaps[2]:null,  // flat line from snap[1]
+    liveTick>=3?phaseSnaps[3]:null,
+    liveTick>=4?phaseSnaps[4]:null,
+  ];
+  // Connect flat segments: during Ub, phase doesn't change
+  // We'll draw Ub segments as horizontal by setting same value
+  // Actually the snap values already reflect this since we stored them
+  // phaseSnaps[2] = relPhaseNorm(winner.s2) ≈ relPhaseNorm(winner.s1) since Ub doesn't change phase
+  // Same for snap[4] ≈ snap[3]
+
+  const probDisplayW=[
+    probSnapsW[0],
+    liveTick>=1?probSnapsW[1]:null,
+    liveTick>=2?probSnapsW[2]:null,
+    liveTick>=3?probSnapsW[3]:null,
+    liveTick>=4?probSnapsW[4]:null,
+  ];
+
+  drawChartBase(
+    document.getElementById('chart-phase'),90,
+    'Relative Phase φ','#c07800','Relative Phase φ',0,1,
+    phaseDisplay,liveTick,livePhase,phaseActive,null
+  );
+  drawChartBase(
+    document.getElementById('chart-prob'),90,
+    'P(|0⟩)','#1a5fd4','P(|0⟩)',0,1,
+    probDisplayW,liveTick,liveP0W,probActive,
+    [{snaps:[probSnapsL[0],
+             liveTick>=1?probSnapsL[1]:null,
+             liveTick>=2?probSnapsL[2]:null,
+             liveTick>=3?probSnapsL[3]:null,
+             liveTick>=4?probSnapsL[4]:null],
+      color:'#cc1a44',opacity:.45}]
+  );
+}
+
+// ── Three.js ──────────────────────────────────────────────────────────────
+const bc=document.getElementById('bc');
+const bwrap=document.getElementById('bloch-wrap');
+const renderer=new THREE.WebGLRenderer({canvas:bc,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setClearColor(0xf5f7fc,1);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(42,1,.01,100);
+camera.position.set(2.8,1.6,2.6);camera.lookAt(0,0,0);
+function resizeB(){const W=bwrap.clientWidth,H=bwrap.clientHeight;
+  renderer.setSize(W,H,false);camera.aspect=W/H;camera.updateProjectionMatrix();}
+resizeB();new ResizeObserver(resizeB).observe(bwrap);
+let isDrag=false,lx=0,ly=0,theta=.75,phi=.95;
+bc.addEventListener('mousedown',e=>{isDrag=true;lx=e.clientX;ly=e.clientY});
+window.addEventListener('mouseup',()=>isDrag=false);
+window.addEventListener('mousemove',e=>{if(!isDrag)return;
+  theta-=(e.clientX-lx)*.008;phi-=(e.clientY-ly)*.008;
+  phi=Math.max(.05,Math.min(Math.PI-.05,phi));lx=e.clientX;ly=e.clientY});
+bc.addEventListener('wheel',e=>camera.position.multiplyScalar(e.deltaY>0?1.07:.94),{passive:true});
+
+// Sphere
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(1,64,64),
+  new THREE.MeshPhongMaterial({color:0xd0ddf5,transparent:true,opacity:.24,side:THREE.FrontSide})));
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(1.001,24,24),
+  new THREE.MeshBasicMaterial({color:0x8aabdd,wireframe:true,transparent:true,opacity:.08})));
+const gc128=fn=>{const p=[];for(let i=0;i<=128;i++){const a=2*Math.PI*i/128;p.push(fn(a))}return p};
+[[a=>new THREE.Vector3(Math.cos(a),0,Math.sin(a))],
+ [a=>new THREE.Vector3(Math.cos(a),Math.sin(a),0)],
+ [a=>new THREE.Vector3(0,Math.cos(a),Math.sin(a))],
+].forEach(([fn])=>scene.add(new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(gc128(fn)),
+  new THREE.LineBasicMaterial({color:0x8aabdd,transparent:true,opacity:.28}))));
+[[1,0,0,0xcc2244],[0,1,0,0x007a48],[0,0,1,0x0055cc]].forEach(([x,y,z,col])=>{
+  const pts=[new THREE.Vector3(-x*1.42,-z*1.42,-y*1.42),new THREE.Vector3(x*1.42,z*1.42,y*1.42)];
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.4})));
+});
+const pole0=new THREE.Mesh(new THREE.SphereGeometry(.07,16,16),
+  new THREE.MeshBasicMaterial({color:0x007a48}));
+pole0.position.set(0,1,0);scene.add(pole0);
+const halo=new THREE.Mesh(new THREE.TorusGeometry(.13,.007,8,64),
+  new THREE.MeshBasicMaterial({color:0x007a48,transparent:true,opacity:.5}));
+halo.position.set(0,1,0);halo.rotation.x=Math.PI/2;scene.add(halo);
+const startDot=new THREE.Mesh(new THREE.SphereGeometry(.033,10,10),
+  new THREE.MeshBasicMaterial({color:0x4466bb,transparent:true,opacity:.45}));
+startDot.position.set(1,0,0);scene.add(startDot);
+scene.add(new THREE.AmbientLight(0xffffff,.7));
+const dl=new THREE.DirectionalLight(0x6688cc,.8);dl.position.set(3,5,4);scene.add(dl);
+const dl2=new THREE.DirectionalLight(0xffffff,.4);dl2.position.set(-2,2,-3);scene.add(dl2);
+
+function makeArrow(color,rs,rc,op=1){
+  const col=new THREE.Color(color);
+  const mat=new THREE.MeshPhongMaterial({color,emissive:col.clone().multiplyScalar(.08),
+    transparent:op<1,opacity:op,shininess:50});
+  const stick=new THREE.Mesh(new THREE.CylinderGeometry(rs,rs,1,10),mat);
+  const head =new THREE.Mesh(new THREE.ConeGeometry(rc,.13,10),mat);
+  stick.position.y=.5;head.position.y=1.065;
+  const g=new THREE.Group();g.add(stick,head);scene.add(g);
+  return{g,stick,head,mat};
+}
+function setArr({g,stick,head},bx,by,bz){
+  const dir=new THREE.Vector3(bx,bz,by).normalize();
+  g.setRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),dir));
+  const len=Math.sqrt(bx*bx+by*by+bz*bz)||1;
+  stick.scale.y=len;stick.position.y=len/2;head.position.y=len+.065;
+}
+const MAX_TRAIL=600;
+CANDS.forEach(c=>{
+  c.arrow=makeArrow(c.ci,.013,.044,c.isWinner?1:c.isLoser?.7:.6);
+  const pos=new Float32Array(MAX_TRAIL*3);
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setDrawRange(0,0);
+  scene.add(new THREE.Line(geo,new THREE.LineBasicMaterial(
+    {color:c.ci,transparent:true,opacity:c.isWinner?.6:c.isLoser?.28:.2})));
+  c.trail={pos,geo,n:0};
+  const rd=new THREE.Mesh(new THREE.SphereGeometry(c.isWinner?.08:.052,12,12),
+    new THREE.MeshBasicMaterial({color:c.ci,transparent:true,opacity:0}));
+  scene.add(rd);c.rdot=rd;
+});
+function addTrail(c,bx,by,bz){
+  const tr=c.trail;if(tr.n>=MAX_TRAIL)return;
+  tr.pos[tr.n*3]=bx;tr.pos[tr.n*3+1]=bz;tr.pos[tr.n*3+2]=by;
+  tr.geo.attributes.position.needsUpdate=true;tr.n++;tr.geo.setDrawRange(0,tr.n);
+}
+
+// Candidate UI
+const candList=document.getElementById('cand-list');
+CANDS.forEach((c,i)=>{
+  const row=document.createElement('div');row.className='cand-row';row.id=`cr${i}`;
+  const lbl=c.isWinner?'★ Optimal':c.isLoser?'✗ Worst':`Cand. ${i+1}`;
+  row.innerHTML=`
+    <div class="cand-dot" style="background:${c.ch}"></div>
+    <div class="cand-label" id="cl${i}" style="color:${c.ch}">${lbl}</div>
+    <div class="cand-bar-wrap"><div class="cand-bar" id="cb${i}" style="background:${c.ch};width:50%"></div></div>
+    <div class="cand-p" id="cp${i}" style="color:${c.ch}">0.500</div>`;
+  candList.appendChild(row);
+});
+
+let oTimer=null;
+function showOverlay(txt,sub,col,dur=1100){
+  document.getElementById('ol-big').textContent=txt;
+  document.getElementById('ol-big').style.color=col;
+  document.getElementById('ol-sm').textContent=sub;
+  const ol=document.getElementById('overlay');
+  ol.style.opacity='1';clearTimeout(oTimer);
+  oTimer=setTimeout(()=>ol.style.opacity='0',dur);
+}
+
+// ── Phase meta ────────────────────────────────────────────────────────────
+const PMETA={
+  init: {badge:'Initial State |+⟩',           col:'#1a5fd4',gtype:'none',  sub:'All at the equator · P(|0⟩)=0.5'},
+  uc1:  {badge:'Layer 1 — U_C(γ₁)  PHASE ↑',  col:'#c07800',gtype:'phase', sub:'Z-rotation · phase shifts · prob stays flat'},
+  p1:   {badge:'After U_C(γ₁) — phase set',   col:'#888',   gtype:'none',  sub:'Candidates diverged in phase'},
+  ub1:  {badge:'Layer 1 — U_B(β₁)  PROB ↑',   col:'#1a5fd4',gtype:'mixer', sub:'X-rotation · phase→amplitude · prob changes'},
+  p2:   {badge:'Layer 1 complete ✓',           col:'#007a48',gtype:'none',  sub:'First layer done · probs separated'},
+  uc2:  {badge:'Layer 2 — U_C(γ₂)  PHASE ↑',  col:'#c07800',gtype:'phase', sub:'Second Z-rotation · more phase accumulation'},
+  p3:   {badge:'After U_C(γ₂) — phase set',   col:'#888',   gtype:'none',  sub:'Even more phase divergence'},
+  ub2:  {badge:'Layer 2 — U_B(β₂)  PROB ↑',   col:'#1a5fd4',gtype:'mixer', sub:'Second X-rotation · amplifies |0⟩ further'},
+  final:{badge:'✦ Final State |ψ_final⟩',       col:'#007a48',gtype:'none',  sub:'★ Optimal candidate maximises P(|0⟩)'},
+};
+const OVL={
+  uc1: ['U_C(γ₁)','Phase only ↑  ·  probability stays flat','#c07800'],
+  ub1: ['U_B(β₁)','Probability ↑  ·  phase gets mixed into amplitude','#1a5fd4'],
+  uc2: ['U_C(γ₂)','Phase only ↑  ·  probability still flat','#c07800'],
+  ub2: ['U_B(β₂)','Probability ↑  ·  optimal candidate reaches |0⟩','#1a5fd4'],
+  final:['Solution!','Optimal (γ*,β*) maximised P(|0⟩) after 2 layers','#007a48'],
+};
+
+// ph → live tick index (fractional during animation)
+function getTickIdx(ph,t){
+  if(ph==='init') return 0;
+  if(ph==='uc1')  return t;         // 0→1
+  if(ph==='p1')   return 1;
+  if(ph==='ub1')  return 1+t;       // 1→2
+  if(ph==='p2')   return 2;
+  if(ph==='uc2')  return 2+t;       // 2→3
+  if(ph==='p3')   return 3;
+  if(ph==='ub2')  return 3+t;       // 3→4
+  return 4;
+}
+
+let prevPh='';
+function tick(){
+  if(!playing)return;
+  if(seqIdx>=SEQ.length){
+    seqIdx=0;prevPh='';
+    CANDS.forEach(c=>{c.trail.n=0;c.trail.geo.setDrawRange(0,0);c.rdot.material.opacity=0;});
+  }
+  const {ph,t}=SEQ[seqIdx];seqIdx++;
+  const m=PMETA[ph];
+
+  // Live chart values
+  const psiW=getPsi(winner,ph,t);
+  const psiL=getPsi(loser,ph,t);
+  liveGateType=m.gtype;
+  liveTick=getTickIdx(ph,t);
+  livePhase=relPhaseNorm(psiW);
+  liveP0W=prob0(psiW);
+  liveP0L=prob0(psiL);
+
+  // Bloch arrows
+  CANDS.forEach((c,i)=>{
+    const psi=getPsi(c,ph,t);
+    const [bx,by,bz]=bloch(psi);
+    setArr(c.arrow,bx,by,bz);
+    if(['uc1','ub1','uc2','ub2'].includes(ph)&&seqIdx%3===0) addTrail(c,bx,by,bz);
+    if(ph==='final'){
+      c.arrow.mat.opacity=c.isWinner?1:c.isLoser?.28:.24;
+      c.rdot.material.opacity=.9;c.rdot.position.set(bx,bz,by);
+    } else c.rdot.material.opacity=0;
+    const p0=prob0(psi);
+    document.getElementById(`cb${i}`).style.width=(p0*100)+'%';
+    document.getElementById(`cp${i}`).textContent=p0.toFixed(3);
+    const row=document.getElementById(`cr${i}`);
+    if(ph==='final')
+      row.className=c.isWinner?'cand-row cand-winner':c.isLoser?'cand-row cand-loser':'cand-row';
+    else row.className='cand-row';
+  });
+
+  // Changing box
+  const cp=document.getElementById('ci-phase');
+  const cpr=document.getElementById('ci-prob');
+  const cpv=document.getElementById('ci-phase-val');
+  const cprv=document.getElementById('ci-prob-val');
+  cpv.textContent=(livePhase*360).toFixed(1)+'°';
+  cprv.textContent=liveP0W.toFixed(3);
+  if(m.gtype==='phase'){
+    cp.className='change-item ci-active-phase';cpr.className='change-item ci-frozen';
+  } else if(m.gtype==='mixer'){
+    cpr.className='change-item ci-active-prob';cp.className='change-item ci-frozen';
+  } else {
+    cp.className='change-item';cpr.className='change-item';
+  }
+
+  halo.scale.set(1+.06*Math.sin(seqIdx*.07),1+.06*Math.sin(seqIdx*.07),1);
+
+  if(ph!==prevPh){
+    const badge=document.getElementById('phase-badge');
+    badge.textContent=m.badge;badge.style.color=m.col;badge.style.borderColor=m.col+'33';
+    document.getElementById('step-info').textContent=m.sub;
+    if(OVL[ph]){const[tt,ss,cc]=OVL[ph];showOverlay(tt,ss,cc,ph==='final'?2200:1200);}
+    prevPh=ph;
+  }
+
+  redrawCharts();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+const TICK_MS=22;let lastT2=0;
+function animate(ts){
+  requestAnimationFrame(animate);
+  if(ts-lastT2>TICK_MS){tick();lastT2=ts;}
+  const r=camera.position.length();
+  camera.position.set(r*Math.sin(phi)*Math.sin(theta),r*Math.cos(phi),r*Math.sin(phi)*Math.cos(theta));
+  camera.lookAt(0,0,0);
+  renderer.render(scene,camera);
+}
+CANDS.forEach(c=>setArr(c.arrow,1,0,0));
+redrawCharts();
+requestAnimationFrame(animate);
+
+document.getElementById('btn-play').addEventListener('click',function(){
+  playing=!playing;this.textContent=playing?'⏸ Pause':'▶ Play';});
+document.getElementById('btn-reset').addEventListener('click',()=>{
+  seqIdx=0;prevPh='';playing=true;liveTick=0;liveGateType='none';
+  document.getElementById('btn-play').textContent='⏸ Pause';
+  CANDS.forEach(c=>{c.trail.n=0;c.trail.geo.setDrawRange(0,0);c.rdot.material.opacity=0;setArr(c.arrow,1,0,0);});
+  redrawCharts();
+});
+</script>
+</body>
+</html>
